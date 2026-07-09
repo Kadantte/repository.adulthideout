@@ -63,6 +63,18 @@ class Po85(BaseWebsite):
             "Connection": "keep-alive",
         }
 
+    def _thumb(self, thumb):
+        # Cloudflare blocks Kodi's internal image loader (TLS fingerprint),
+        # so route artwork through the local on-demand thumb proxy from the
+        # service. Instant listing, no disk cache, images load lazily.
+        if not thumb or not thumb.startswith("http"):
+            return thumb or self.icons['default']
+        try:
+            from resources.lib.thumb_proxy import build_thumb_url
+            return build_thumb_url(thumb, referer="https://www.85po.com/")
+        except Exception:
+            return thumb
+
     def make_request(self, url):
         self.logger.info(f"[85po] Requesting: {url}")
         if not self.session:
@@ -118,11 +130,11 @@ class Po85(BaseWebsite):
                 continue
             video_url, video_id, title = match.groups()
             title = html.unescape(title.strip())
-            
+
             # Extract thumbnail
             thumb_match = re.search(r'data-original="([^"]+)"', chunk)
             thumb = thumb_match.group(1) if thumb_match else self.icons['default']
-            
+
             # Extract duration
             duration_match = re.search(r'<div class="time">(?:<span[^>]*></span>)?\s*([^<]+)</div>', chunk)
             duration_sec = 0
@@ -130,11 +142,13 @@ class Po85(BaseWebsite):
                 duration_str = duration_match.group(1).strip()
                 duration_sec = self.convert_duration(duration_str)
 
+            thumb = self._thumb(thumb)
+
             # Map Explore Similar context menu
             context_menu = [
                 ('Explore similar', f'RunPlugin({sys.argv[0]}?mode=7&action=explore_similar&website={self.name}&original_url={urllib.parse.quote_plus(video_url)})')
             ]
-            
+
             info_labels = {}
             if duration_sec > 0:
                 info_labels['duration'] = duration_sec
@@ -259,7 +273,7 @@ class Po85(BaseWebsite):
             if best_scrambled.startswith("function/0/") and kvs_decode_url is not None and license_code:
                 try:
                     resolved_url = kvs_decode_url(best_scrambled, license_code)
-                    self.logger.info(f"[85po] Decoded KVS URL successfully")
+                    self.logger.info("[85po] Decoded KVS URL successfully")
                 except Exception as e:
                     self.logger.error(f"[85po] Failed to decode KVS URL: {e}")
                     # Fallback to stripping function/0/
@@ -355,11 +369,11 @@ class Po85(BaseWebsite):
             slug, title = match.groups()
             video_url = f"{self.base_url}/v/{slug}"
             title = html.unescape(title.strip())
-            
+
             # Extract thumbnail
             thumb_match = re.search(r"url\('([^']+)'\)", chunk) or re.search(r'src="([^"]+)"', chunk)
             thumb = thumb_match.group(1) if thumb_match else self.icons['default']
-            
+
             # Extract duration
             duration_match = re.search(r'<span class="duration">([^<]+)</span>', chunk)
             duration_sec = 0
@@ -367,10 +381,12 @@ class Po85(BaseWebsite):
                 duration_str = duration_match.group(1).strip()
                 duration_sec = self.convert_duration(duration_str)
 
+            thumb = self._thumb(thumb)
+
             context_menu = [
                 ('Explore similar', f'RunPlugin({sys.argv[0]}?mode=7&action=explore_similar&website={self.name}&original_url={urllib.parse.quote_plus(video_url)})')
             ]
-            
+
             info_labels = {}
             if duration_sec > 0:
                 info_labels['duration'] = duration_sec

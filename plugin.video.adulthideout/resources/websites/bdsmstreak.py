@@ -1,11 +1,9 @@
 
 import re
-import sys
 import urllib.parse
 import urllib.request
 import xbmcgui
 import xbmcplugin
-import xbmc
 from resources.lib.base_website import BaseWebsite
 
 class BdsmstreakWebsite(BaseWebsite):
@@ -28,8 +26,8 @@ class BdsmstreakWebsite(BaseWebsite):
             sort_index = 0
         
         if sort_index == 1:
-            return f"{self.base_url}/most", f"BDSMstreak - Popular"
-        return self.base_url, f"BDSMstreak - Newest"
+            return f"{self.base_url}/most", "BDSMstreak - Popular"
+        return self.base_url, "BDSMstreak - Newest"
 
     def make_request(self, url):
         try:

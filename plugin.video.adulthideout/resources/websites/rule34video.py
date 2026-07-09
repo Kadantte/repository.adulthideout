@@ -10,7 +10,6 @@ import xbmcgui
 import xbmcplugin
 import xbmcaddon
 import os
-import json
 from http.server import BaseHTTPRequestHandler, HTTPServer
 
 try:
@@ -157,7 +156,7 @@ class Rule34video(BaseWebsite):
         self.timeout = 45
 
     def get_session(self):
-        global _SESSION_CACHE, _SESSION_LOCK
+        global _SESSION_CACHE
         with _SESSION_LOCK:
             if self.scraper:
                 return self.scraper

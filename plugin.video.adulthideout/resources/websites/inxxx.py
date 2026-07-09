@@ -41,6 +41,12 @@ class InXXX(KVSTubeWebsite):
         parsed = urllib.parse.urlparse(url or self.base_url)
         return parsed.path.rstrip("/") in ("", "/top-rated")
 
+    def get_page_url(self, base_url, page_num):
+        parsed = urllib.parse.urlparse(base_url or self.base_url)
+        if page_num > 1 and not parsed.path.strip("/"):
+            return urllib.parse.urljoin(self.base_url, "best/{}/".format(page_num))
+        return super().get_page_url(base_url, page_num)
+
     def _pick_thumb(self, img_tag):
         # InXXX exposes a real JPEG in src but a webp (disguised as .jpg) in
         # data-webp, which Kodi's texture loader cannot decode. Prefer src.
@@ -48,5 +54,14 @@ class InXXX(KVSTubeWebsite):
         if src_match:
             thumb = self._absolute(src_match.group(1))
             if not thumb.startswith("data:image/"):
-                return thumb
-        return super()._pick_thumb(img_tag)
+                return self._thumb_with_headers(thumb)
+        return self._thumb_with_headers(super()._pick_thumb(img_tag))
+
+    def _thumb_with_headers(self, thumb):
+        if not thumb or not thumb.startswith("http") or "|" in thumb:
+            return thumb
+        return "{}|User-Agent={}&Referer={}".format(
+            thumb,
+            urllib.parse.quote(self.ua),
+            urllib.parse.quote(self.base_url),
+        )

@@ -5,11 +5,8 @@ import re
 import urllib.parse
 import html
 import os
-import sys
-import xbmc
 import xbmcgui
 import xbmcplugin
-import xbmcaddon
 from resources.lib.base_website import BaseWebsite
 
 

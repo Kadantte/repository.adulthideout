@@ -7,7 +7,6 @@ import urllib.request
 from http.cookiejar import CookieJar
 from io import BytesIO
 import gzip
-import traceback
 import html
 import xbmc
 import xbmcgui
@@ -287,7 +286,7 @@ class Xnxx(BaseWebsite):
                 ]
                 display_title = f"{title} [COLOR yellow]({duration})[/COLOR]"
                 self.add_link(name=display_title, url=video_url, mode=4, icon=large_thumb, fanart=self.fanart, context_menu=context_menu)
-        except Exception as e:
+        except Exception:
             self.notify_error("Failed to parse related videos")
             
         self.end_directory()

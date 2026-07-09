@@ -3,7 +3,7 @@
 import sys
 import json
 import urllib.parse
-from urllib import request, error
+from urllib import request
 import xbmc
 import xbmcgui
 import xbmcplugin

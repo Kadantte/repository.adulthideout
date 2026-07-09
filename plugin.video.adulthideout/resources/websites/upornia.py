@@ -1,4 +1,3 @@
-import sys
 import xbmcgui
 import xbmcplugin
 import json
@@ -124,8 +123,7 @@ class Upornia(BaseWebsite):
             vid_id = video.get('video_id')
             title = video.get('title')
             thumb = video.get('scr') # 'scr' seems to be the thumbnail key in Upornia JSON
-            duration = video.get('duration')
-            
+
             # Construct playable URL trigger
             video_url = f"PLAY_VIDEO:{vid_id}"
             self.add_link(title, video_url, 4, thumb, self.fanart)
@@ -138,7 +136,6 @@ class Upornia(BaseWebsite):
         self.end_directory()
 
     def process_categories(self, url):
-        import urllib.request
         api_url = "https://upornia.com/api/json/categories/14400/str.all.en.json"
         content = self.make_request(api_url, headers=self.headers)
         if not content:
@@ -191,7 +188,7 @@ class Upornia(BaseWebsite):
             final_url = self.BASE_URL + final_url
 
         try:
-            from resources.lib.proxy_utils import ProxyController, PlaybackGuard
+            from resources.lib.proxy_utils import ProxyController
             controller = ProxyController(final_url, upstream_headers={
                 "User-Agent": self.ua,
                 "Referer": self.BASE_URL

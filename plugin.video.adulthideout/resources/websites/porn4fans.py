@@ -10,7 +10,6 @@ import sys
 import hashlib
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
-import xbmc
 import xbmcgui
 import xbmcplugin
 import xbmcvfs

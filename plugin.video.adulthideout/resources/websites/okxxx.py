@@ -1,9 +1,9 @@
 # -*- coding: utf-8 -*-
 import xbmcplugin
 import xbmcgui
-import xbmc
 from resources.lib.base_website import BaseWebsite
 import re
+import sys
 import urllib.parse
 from html import unescape
 

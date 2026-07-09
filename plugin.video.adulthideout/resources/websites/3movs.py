@@ -1,6 +1,5 @@
 from resources.lib.base_website import BaseWebsite
 import re
-import sys
 import urllib.parse
 import html as html_module
 
@@ -76,9 +75,6 @@ class ThreeMovs(BaseWebsite):
             self.end_directory()
             return
 
-        is_category_context = ('/categories/' in current_url and not current_url.endswith('/categories/'))
-        is_search_context = ('/search_videos/' in current_url)
-        
         # Always add Search and Categories for easy navigation
         self.add_dir('Search', '', 5, self.icons.get('search'), name_param=self.name)
         self.add_dir('Categories', f"{self.base_url}/categories/", 8, self.icons.get('categories'), name_param=self.name)
@@ -152,7 +148,6 @@ class ThreeMovs(BaseWebsite):
     def play_video(self, url):
         import xbmcgui
         import xbmcplugin
-        import sys
         
         page_html = self.make_request(url)
         if not page_html:
@@ -177,7 +172,7 @@ class ThreeMovs(BaseWebsite):
         if stream_url:
             try:
                 from resources.lib.proxy_utils import ProxyController, PlaybackGuard
-                import xbmc, xbmcplugin
+                import xbmc
                 
                 # Use same UA as in make_request
                 ua = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'

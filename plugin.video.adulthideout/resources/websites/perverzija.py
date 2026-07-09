@@ -30,8 +30,6 @@ except Exception:
 
 if not _HAS_CURL:
     try:
-        import glob
-
         local_app_data = os.environ.get("LOCALAPPDATA", "")
         pattern = os.path.join(local_app_data, "Programs", "Python", "Python*", "Lib", "site-packages")
         for site_packages in sorted(glob.glob(pattern), reverse=True):

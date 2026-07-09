@@ -184,7 +184,9 @@ class XFreeHD(BaseWebsite):
 
     def search(self, query):
         if query:
-            search_url = "{}search?search_query={}".format(self.base_url, urllib.parse.quote_plus(query.strip()))
+            search_url = "{}search?search_query={}&search_type=videos".format(
+                self.base_url, urllib.parse.quote_plus(query.strip())
+            )
             self.process_content(search_url)
 
     def resolve_recording_stream(self, url):

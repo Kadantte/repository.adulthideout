@@ -2,10 +2,8 @@ import re
 import urllib.parse
 import html
 import os
-import xbmc
 import xbmcgui
 import xbmcplugin
-import sys
 from resources.lib.base_website import BaseWebsite
 
 class PornHat(BaseWebsite):

@@ -9,9 +9,9 @@ import xbmcplugin
 import xbmcaddon
 
 try:
-    import json
+    pass
 except ImportError:
-    import simplejson as json
+    pass
 
 from resources.lib.base_website import BaseWebsite
 from resources.lib.decoders.kvs_decoder import kvs_decode_url

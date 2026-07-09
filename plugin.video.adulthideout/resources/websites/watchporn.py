@@ -5,6 +5,7 @@ import sys
 import urllib.parse
 
 import requests
+import xbmc
 import xbmcgui
 import xbmcplugin
 

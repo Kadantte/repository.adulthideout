@@ -1,6 +1,8 @@
 
 import sys, os, re, urllib.parse, html
-import xbmc, xbmcgui, xbmcplugin, xbmcaddon
+import xbmcgui
+import xbmcplugin
+import xbmcaddon
 from resources.lib.base_website import BaseWebsite
 
 try:

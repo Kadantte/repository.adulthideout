@@ -2,10 +2,7 @@ import base64
 import codecs
 import html
 import json
-import os
 import re
-import ssl
-import sys
 import urllib.parse
 import urllib.request
 

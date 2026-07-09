@@ -3,7 +3,6 @@ import re
 import urllib.parse
 import sys
 import os
-import xbmc
 import xbmcgui
 import xbmcplugin
 import html

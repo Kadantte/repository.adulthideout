@@ -1,5 +1,10 @@
-import sys, os, json, re, urllib.parse
-import xbmc, xbmcaddon, xbmcgui, xbmcplugin
+import sys
+import os
+import re
+import urllib.parse
+import xbmcaddon
+import xbmcgui
+import xbmcplugin
 from resources.lib.base_website import BaseWebsite
 
 try:

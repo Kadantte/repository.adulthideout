@@ -309,7 +309,7 @@ class AshemaletubeWebsite(BaseWebsite):
                             self.add_dir(f"{name} ({videos} Videos)", urllib.parse.urljoin(base_url, cat_url), 2, thumb, self.fanart)
                     self.end_directory()
                     return
-            except json.JSONDecodeError as e:
+            except json.JSONDecodeError:
                 pass
         self.notify_error("Failed to load categories.")
         self.end_directory()

@@ -133,7 +133,7 @@ class MissavWebsite(BaseWebsite):
         try:
             headers = self.get_headers(self.base_url)
             request = urllib_request.Request(self.base_url, headers=headers)
-            with self.opener.open(request, timeout=20) as response:
+            with self.opener.open(request, timeout=20):
                 self.session_established = True
                 return True
         except Exception as e:

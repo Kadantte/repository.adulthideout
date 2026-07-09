@@ -255,24 +255,53 @@ class Eporner(BaseWebsite):
                 stream_url = data.get('sources', {}).get('hls', {}).get('auto', {}).get('src')
 
             if stream_url:
-                kodi_headers = {'User-Agent': self.ua, 'Referer': url}
-                if self.session:
-                    cookies = self.session.cookies.get_dict()
-                    if cookies:
-                        kodi_headers['Cookie'] = "; ".join([f"{k}={v}" for k, v in cookies.items()])
-                
-                final_url = f"{stream_url}|{urllib.parse.urlencode(kodi_headers)}"
-                
-                li = xbmcgui.ListItem(path=final_url)
-                li.setProperty('IsPlayable', 'true')
                 if '.m3u8' in stream_url:
+                    kodi_headers = {'User-Agent': self.ua, 'Referer': url}
+                    header_str = "&".join(
+                        f"{k}={urllib.parse.quote(v, safe='')}" for k, v in kodi_headers.items()
+                    )
+                    li = xbmcgui.ListItem(path=f"{stream_url}|{header_str}")
+                    li.setProperty('IsPlayable', 'true')
                     li.setMimeType('application/vnd.apple.mpegurl')
                     li.setProperty('inputstream', 'inputstream.adaptive')
                     li.setProperty('inputstream.adaptive.manifest_type', 'hls')
-                else:
-                    li.setMimeType('video/mp4')
-                
+                    xbmcplugin.setResolvedUrl(self.addon_handle, True, li)
+                    return
+
+                # Kodi's internal curl stalls on the eporner video CDNs
+                # (vid-*-cdn.eporner.com) while Python sessions stream fine,
+                # so route playback through the local proxy like other sites.
+                from resources.lib.proxy_utils import ProxyController, PlaybackGuard
+
+                controller = ProxyController(
+                    stream_url,
+                    upstream_headers={
+                        'User-Agent': self.ua,
+                        'Referer': url,
+                        # vid-*.eporner.com is same-site to eporner.com; the
+                        # proxy's default Sec-Fetch-Site "cross-site" makes
+                        # the CDN serve a ~640KB placeholder clip instead of
+                        # the real video
+                        'Sec-Fetch-Site': 'same-site',
+                        'Sec-Fetch-Mode': 'no-cors',
+                        'Sec-Fetch-Dest': 'video',
+                    },
+                    cookies=self.session.cookies.get_dict() if self.session else None,
+                    session=self.session,
+                    skip_resolve=True,
+                )
+                local_url = controller.start()
+
+                guard = PlaybackGuard(xbmc.Player(), xbmc.Monitor(), local_url, controller)
+                guard.start()
+
+                li = xbmcgui.ListItem(path=local_url)
+                li.setProperty('IsPlayable', 'true')
+                li.setMimeType('video/mp4')
+                li.setContentLookup(False)
+
                 xbmcplugin.setResolvedUrl(self.addon_handle, True, li)
+                guard.join()
             else:
                 self.notify_error("No stream found")
 

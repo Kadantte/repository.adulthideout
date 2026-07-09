@@ -36,8 +36,8 @@ class ParadisehillWebsite(BaseWebsite):
 
     def make_request(self, url):
         try:
-            with self.opener.open(self.base_url, timeout=15) as initial_response:
-                pass 
+            with self.opener.open(self.base_url, timeout=15):
+                pass
             
             with self.opener.open(url, timeout=15) as response:
                 return response.read().decode('utf-8')

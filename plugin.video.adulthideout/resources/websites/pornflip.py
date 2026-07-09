@@ -235,7 +235,6 @@ class Pornflip(BaseWebsite):
                 return master_url
 
             variants = []
-            current_resolution = 0
             pending_resolution = None
             for raw_line in response.text.splitlines():
                 line = raw_line.strip()

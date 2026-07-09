@@ -26,7 +26,7 @@ LOGOS_DIR = os.path.join(RESOURCES_DIR, 'logos')
 FANART_PATH = os.path.join(LOGOS_DIR, 'fanart.jpg')
 DEFAULT_ICON_PATH = os.path.join(LOGOS_DIR, 'icon.png')
 VIEW_SERVICE_PATH = os.path.join(ADDON_PATH, 'resources', 'lib', 'view_service.py')
-VIEW_SERVICE_VERSION = "9"
+VIEW_SERVICE_VERSION = "16"
 
 dns_retry.install()
 
@@ -43,8 +43,7 @@ def ensure_view_service():
         service_version = window.getProperty("AdultHideout.ViewServiceVersion")
         if (not service_running or service_version != VIEW_SERVICE_VERSION) and xbmcvfs.exists(VIEW_SERVICE_PATH):
             if service_running and service_version != VIEW_SERVICE_VERSION:
-                for script_id in (VIEW_SERVICE_PATH, ADDON_ID):
-                    xbmc.executebuiltin("StopScript({})".format(script_id))
+                xbmc.executebuiltin("StopScript({})".format(VIEW_SERVICE_PATH))
                 xbmc.sleep(500)
             xbmc.executebuiltin("RunScript({})".format(VIEW_SERVICE_PATH))
     except Exception as exc:
@@ -60,13 +59,18 @@ def build_main_menu_fast():
         xbmcplugin.endOfDirectory(ADDON_HANDLE)
         return
 
-    log(f"Scanning for websites in: {WEBSITES_DIR}")
+    log(f"Scanning for websites in: {WEBSITES_DIR}", xbmc.LOGDEBUG)
+
+    try:
+        available_logos = set(os.listdir(LOGOS_DIR))
+    except OSError:
+        available_logos = set()
 
     found_any = False
 
     global_search_item = xbmcgui.ListItem(label="[COLOR yellow]Global Search[/COLOR]")
     global_search_icon = os.path.join(LOGOS_DIR, "search.png")
-    if not xbmcvfs.exists(global_search_icon):
+    if "search.png" not in available_logos:
         global_search_icon = DEFAULT_ICON_PATH
     global_search_item.setArt({"icon": global_search_icon, "thumb": global_search_icon, "fanart": FANART_PATH})
     xbmcplugin.addDirectoryItem(
@@ -112,11 +116,14 @@ def build_main_menu_fast():
 
         label = module_raw_name.replace('_', ' ').replace('-', ' ').title()
         
-        icon_path = os.path.join(LOGOS_DIR, f"{module_raw_name}.png")
-        if not xbmcvfs.exists(icon_path):
-            icon_path = os.path.join(LOGOS_DIR, f"{module_raw_name.replace('_', '-')}.png")
-            if not xbmcvfs.exists(icon_path):
-                icon_path = DEFAULT_ICON_PATH
+        icon_name = f"{module_raw_name}.png"
+        fallback_name = f"{module_raw_name.replace('_', '-')}.png"
+        if icon_name in available_logos:
+            icon_path = os.path.join(LOGOS_DIR, icon_name)
+        elif fallback_name in available_logos:
+            icon_path = os.path.join(LOGOS_DIR, fallback_name)
+        else:
+            icon_path = DEFAULT_ICON_PATH
 
         context_menu = [
             ('Sort by...', f'RunPlugin({sys.argv[0]}?mode=7&action=select_sort&website={module_raw_name})'),

@@ -1,7 +1,6 @@
 from resources.lib.base_website import BaseWebsite
 import re
 import sys
-import os
 import html as html_module
 
 class XXXFiles(BaseWebsite):
@@ -326,7 +325,6 @@ class XXXFiles(BaseWebsite):
                     redirect_count += 1
                     continue
                 
-                final_status = status
                 cdn_url = current_url
                 break
             

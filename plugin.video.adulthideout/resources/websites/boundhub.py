@@ -100,7 +100,7 @@ class BoundHub(BaseWebsite):
                 
                 if not video_url.startswith('http') and license_match:
                     license_code = license_match.group(1)
-                    xbmc.log(f"BoundHub: Found encrypted URL, decoding with KVS...", xbmc.LOGINFO)
+                    xbmc.log("BoundHub: Found encrypted URL, decoding with KVS...", xbmc.LOGINFO)
                     video_url = kvs_decode_url(video_url, license_code)
                     xbmc.log(f"BoundHub: Decoded URL: {video_url}", xbmc.LOGINFO)
                 

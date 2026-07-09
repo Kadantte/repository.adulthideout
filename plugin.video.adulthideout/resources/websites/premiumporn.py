@@ -6,7 +6,6 @@ import html
 import json
 import re
 import sys
-import warnings
 import urllib.error
 import urllib.parse
 import urllib.request

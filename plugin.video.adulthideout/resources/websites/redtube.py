@@ -11,8 +11,6 @@ from io import BytesIO
 import xbmc
 import xbmcgui
 import xbmcplugin
-import xbmcvfs
-import os
 from resources.lib.base_website import BaseWebsite
 
 class RedtubeWebsite(BaseWebsite):
@@ -736,7 +734,6 @@ class RedtubeWebsite(BaseWebsite):
 
     def select_pornstar_sort(self, *args):
         """Show a dialog to select pornstar sorting."""
-        import sys
         import xbmcgui
         self.logger.info("Redtube Debug: select_pornstar_sort called")
         dialog = xbmcgui.Dialog()

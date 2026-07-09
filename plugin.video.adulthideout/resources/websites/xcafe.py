@@ -108,7 +108,7 @@ class XcafeWebsite(BaseWebsite):
     # </a>
 
     def _parse_popfire_items(self, content, url_pattern):
-        """
+        r"""
         Parse items that use the popfire link+thumbnail+title structure.
         url_pattern: regex for the href (e.g. r'https://xcafe\.com/videos/[^/"]+/')
         Returns list of (url, thumb, title) tuples.

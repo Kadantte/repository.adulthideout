@@ -27,7 +27,6 @@ except Exception as e:
     xbmc.log(f"[DarknessPorn] cloudscraper import failed: {e}", xbmc.LOGERROR)
     _HAS_CF = False
 
-import requests
 from resources.lib.base_website import BaseWebsite
 from resources.lib.proxy_utils import ProxyController, PlaybackGuard
 
@@ -65,7 +64,7 @@ class DarknessPorn(BaseWebsite):
         Holt die Cloudscraper-Sitzung. Verwendet einen globalen Cache,
         um die Sitzung über mehrere Kodi-Skriptaufrufe hinweg wiederzuverwenden.
         """
-        global _SESSION_CACHE, _SESSION_LOCK
+        global _SESSION_CACHE
         
         with _SESSION_LOCK:
             if self.scraper:
@@ -109,10 +108,11 @@ class DarknessPorn(BaseWebsite):
             except Exception as e:
                 self.logger.error(f"[{self.name}] Failed to create scraper session: {e}")
                 self.notify_error(f"Failed to start session: {e}")
-                
+                error_message = str(e)
+
                 class _NoCF:
-                    def get(self, *a, **kw): raise RuntimeError(f"Scraper init failed: {e}")
-                    def head(self, *a, **kw): raise RuntimeError(f"Scraper init failed: {e}")
+                    def get(self, *a, **kw): raise RuntimeError(f"Scraper init failed: {error_message}")
+                    def head(self, *a, **kw): raise RuntimeError(f"Scraper init failed: {error_message}")
                     @property
                     def cookies(self): from requests.cookies import RequestsCookieJar; return RequestsCookieJar()
                 self.scraper = _NoCF()

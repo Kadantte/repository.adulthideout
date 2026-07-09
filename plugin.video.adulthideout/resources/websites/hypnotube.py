@@ -7,7 +7,6 @@ import urllib.request
 import sys
 import html
 import xbmc
-import xbmcaddon
 import xbmcgui
 import xbmcplugin
 from resources.lib.base_website import BaseWebsite

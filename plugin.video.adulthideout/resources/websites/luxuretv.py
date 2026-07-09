@@ -10,10 +10,10 @@ import gzip
 import html
 import sys
 import xbmc
-import xbmcaddon
 import xbmcgui
 import xbmcplugin
 from resources.lib.base_website import BaseWebsite
+from resources.lib.proxy_utils import PlaybackGuard, ProxyController
 
 class LuxuretvWebsite(BaseWebsite):
     config = {
@@ -43,7 +43,7 @@ class LuxuretvWebsite(BaseWebsite):
         return {
             "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/127.0.0.0 Safari/537.36",
             "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7",
-            "Accept-Encoding": "gzip, deflate, br",
+            "Accept-Encoding": "identity",
             "Accept-Language": "en-US,en;q=0.9",
             "Connection": "keep-alive",
             "Referer": "https://en.luxuretv.com/",
@@ -61,7 +61,7 @@ class LuxuretvWebsite(BaseWebsite):
             handler = urllib.request.HTTPCookieProcessor(cookie_jar)
             opener = urllib.request.build_opener(handler)
             request = urllib.request.Request(url, headers=headers)
-            with opener.open(request, timeout=30) as response:
+            with opener.open(request, timeout=30):
                 cookies = "; ".join([f"{cookie.name}={cookie.value}" for cookie in cookie_jar])
                 return cookies
         except Exception as e:
@@ -126,6 +126,16 @@ class LuxuretvWebsite(BaseWebsite):
         self.add_dir('[COLOR blue]Search[/COLOR]', '', 5, self.icons['search'], self.fanart, name_param=self.name)
         self.add_dir('Categories', self.config['categories_url'], 8, self.icons['categories'], self.fanart)
 
+    def _kodi_image(self, url):
+        if not url or not url.startswith("http") or "|" in url:
+            return url
+        headers = self.get_headers()
+        return "{}|User-Agent={}&Referer={}".format(
+            url,
+            urllib.parse.quote(headers["User-Agent"]),
+            urllib.parse.quote(headers["Referer"]),
+        )
+
     def process_categories(self, url):
         self.add_basic_dirs(url)
         content, _ = self.make_request(url)
@@ -137,10 +147,10 @@ class LuxuretvWebsite(BaseWebsite):
         matches = re.findall(pattern, content, re.DOTALL)
 
         for category_url, thumb, name in matches:
-            if "/out/" in category_url or "javascript:;" in category_url:
+            if "/channels/" not in category_url or "/out/" in category_url or "javascript:;" in category_url:
                 continue
             full_url = urllib.parse.urljoin(self.base_url, category_url)
-            self.add_dir(html.unescape(name), full_url, 2, thumb, self.fanart)
+            self.add_dir(html.unescape(name), full_url, 2, self._kodi_image(thumb), self.fanart)
         
         self.end_directory()
 
@@ -165,7 +175,7 @@ class LuxuretvWebsite(BaseWebsite):
                 display_title = html.unescape(title)
                 if duration:
                     display_title = f"{display_title} [COLOR gray]({duration})[/COLOR]"
-                self.add_link(display_title, full_url, 4, thumb, self.fanart)
+                self.add_link(display_title, full_url, 4, self._kodi_image(thumb), self.fanart)
 
     def add_next_button(self, content, current_url):
         next_page_match = re.search(r'<link rel="next" href="([^"]+)"', content)
@@ -178,7 +188,9 @@ class LuxuretvWebsite(BaseWebsite):
 
     def play_video(self, url):
         content, _ = self.make_request(url)
-        if not content: return
+        if not content:
+            xbmcplugin.setResolvedUrl(self.addon_handle, False, xbmcgui.ListItem())
+            return
         
         match = re.search(r'source src="([^"]+)"', content)
         if not match:
@@ -189,13 +201,30 @@ class LuxuretvWebsite(BaseWebsite):
         if not match:
             self.logger.error(f"No video source found for URL: {url}")
             self.notify_error("Could not find valid stream URL")
+            xbmcplugin.setResolvedUrl(self.addon_handle, False, xbmcgui.ListItem())
             return
             
         video_url = match.group(1).replace('amp;', '')
-        li = xbmcgui.ListItem(path=video_url)
-        li.setProperty("IsPlayable", "true")
-        li.setMimeType("video/mp4" if video_url.endswith(".mp4") else "application/x-mpegURL")
-        xbmcplugin.setResolvedUrl(self.addon_handle, True, li)
+        headers = self.get_headers(url)
+        headers["Referer"] = url
+        try:
+            controller = ProxyController(
+                video_url,
+                upstream_headers=headers,
+                use_urllib=True,
+                probe_size=True,
+            )
+            local_url = controller.start()
+            PlaybackGuard(xbmc.Player(), xbmc.Monitor(), local_url, controller).start()
+            li = xbmcgui.ListItem(path=local_url)
+            li.setProperty("IsPlayable", "true")
+            li.setMimeType("video/mp4")
+            li.setContentLookup(False)
+            xbmcplugin.setResolvedUrl(self.addon_handle, True, li)
+        except Exception as exc:
+            self.logger.error(f"LuxureTV playback proxy failed: {exc}")
+            self.notify_error("Could not start LuxureTV stream")
+            xbmcplugin.setResolvedUrl(self.addon_handle, False, xbmcgui.ListItem())
 
     def search(self, query):
         if not query:

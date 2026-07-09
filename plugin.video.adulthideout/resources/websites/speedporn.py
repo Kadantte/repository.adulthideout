@@ -1,11 +1,9 @@
 # -*- coding: utf-8 -*-
 import html
 import re
-import sys
 import urllib.parse
 
 import requests
-import xbmc
 import xbmcgui
 import xbmcplugin
 

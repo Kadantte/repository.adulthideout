@@ -29,13 +29,13 @@ except ImportError:
 
 
 class LetmejerkWebsite(BaseWebsite):
-    BASE_URL = "https://www.letmejizz.com"
+    BASE_URL = "https://www.letmejizz.co"
 
     def __init__(self, addon_handle, addon=None):
         super().__init__(
             name="letmejerk",
             base_url=self.BASE_URL,
-            search_url="https://www.letmejerk.com/search.php?q={}",
+            search_url="https://www.letmejizz.co/search.php?q={}",
             addon_handle=addon_handle,
             addon=addon
         )

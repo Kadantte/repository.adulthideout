@@ -23,7 +23,6 @@ except Exception:
     xbmcaddon = _Dummy(); xbmcaddon.Addon = _Add
 
 from resources.lib.base_website import BaseWebsite
-from resources.lib.proxy_utils import ProxyController, PlaybackGuard
 
 try:
     addon_path = xbmcaddon.Addon().getAddonInfo('path')
@@ -69,7 +68,7 @@ class YouPornWebsite(BaseWebsite):
         }
 
     def _ensure_session(self):
-        global _SESSION, _LOCK
+        global _SESSION
         with _LOCK:
             if self.scraper:
                 return self.scraper

@@ -2,15 +2,16 @@
   <img src="repository.adulthideout/resources/fanart.jpg" alt="AdultHideout 10th Anniversary" width="100%">
 </p>
 
-<h1 align="center">AdultHideout 1.0.15</h1>
+<h1 align="center">AdultHideout 1.0.16</h1>
 <p align="center">
-  <strong>Harbor</strong><br>
-  Bring it home.
+  <strong>Cartographer</strong><br>
+  More paths. Better playback.<br>
+  Released July 9, 2026.
 </p>
 
-AdultHideout started in **January 2016** as a tiny personal Kodi addon for one site. In its **10th Anniversary Year**, version 1.0.15 turns downloading into a complete, calm and dependable part of the experience.
+AdultHideout started in **January 2016** as a tiny personal Kodi addon for one site. In its **10th Anniversary Year**, the 1.0.15 Harbor release made downloading and offline playback a first-class part of the addon. Cartographer builds on that foundation with broader source coverage and a more resilient runtime.
 
-**Harbor** gives every video a destination. Queue it. Save it locally or across your network. Return to it through the optional Offline videos view. Alongside this new foundation, AdultHideout welcomes ten carefully integrated sources and another round of search, networking and playback refinement.
+**Cartographer** adds twelve carefully integrated sources, fixes difficult playback and thumbnail paths, strengthens Cloudscraper compatibility, and refines Global Search and startup performance. The download and Offline videos foundation from Harbor remains available.
 
 ## Featured Highlights
 
@@ -26,9 +27,9 @@ Choose a local folder or send downloads directly to **SMB** and **NFS** storage.
 
 Enable **Offline videos** to replay completed downloads directly from AdultHideout. It stays disabled by default and only appears when you decide to use it.
 
-### Ten New Sources
+### Twelve New Sources
 
-**Faapy, Fapality, MangoPorn, XGroovy, InXXX, XFreeHD, TrannyVideosXXX, MilfFox, SexVid and TokyoMotion.**
+**AnyPorn, WhoresHub, Fuqster, FreeonesTube, PornKTube, CollectionOfBestPorn, YourLust, XXBrits, PornXP, Sextu, Neporn and YouPerv.**
 
 Every new integration was built around its actual site structure, with the navigation it supports: search, categories, models or performers, sorting and pagination. Playback prefers the best usable source and uses seek-safe proxy handling where the host requires it.
 
@@ -36,12 +37,14 @@ XFreeHD excludes login-only cards, XGroovy and TrannyVideosXXX include populated
 
 ## More Refined Everywhere
 
-- **Global Search:** More reliable cached return-to-results behavior and repeated searches across selected sources.
-- **Network Resilience:** Improved DNS retry handling and shared request fallbacks for fragile sites.
+- **Global Search:** Fixed cross-search cache bleed, restored search scope correctly, kept playable results clean and removed the obsolete version-specific preset.
+- **Cloudflare and Playback:** Repaired challenge-math handling for newer Python versions, improved protected artwork, and made slow or expiring CDN streams more dependable.
+- **Navigation and Performance:** Cached repository metadata and indexed logo lookups to reduce repeated network and filesystem work.
+- **Site Maintenance:** Updated domains and repaired pagination, categories, thumbnails and missing imports across several existing integrations.
 - **Language Polish:** Removed hard-coded German fallback text from otherwise English navigation and dialogs.
 - **Release Integrity:** Refreshed settings, logos, manifests, official hashes and repository metadata.
 
-## Feature Focus: Harbor
+## Feature Focus: Cartographer
 
 Downloading is intentionally simple on first use:
 

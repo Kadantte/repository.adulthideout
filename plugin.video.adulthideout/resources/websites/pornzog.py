@@ -358,7 +358,7 @@ class Pornzog(BaseWebsite):
          
          cat_container_match = re.search(r'<ul[^>]+class=["\'][^"\']*thumbs-list[^"\']*["\']>(.*?)</ul>', content, re.DOTALL | re.IGNORECASE)
          if not cat_container_match:
-             self.logger.error(f"Categories: Konnte 'thumbs-list' Container nicht finden.")
+             self.logger.error("Categories: Konnte 'thumbs-list' Container nicht finden.")
              html_to_search = content
              cat_matches = re.findall(r'<a[^>]+href=["\'](/categories/[^/"]+/|/[^/"]+/)[^"\']*["\'][^>]*>\s*([^<]+?)\s*<', html_to_search, re.DOTALL | re.IGNORECASE)
              categories_added, added_urls = 0, set()
@@ -508,7 +508,7 @@ class Pornzog(BaseWebsite):
              if not sponsor_content:
                  return self.resolve_stream(None, original_pornzog_url, "Sponsor link is broken (404).")
              
-             self.logger.warning(f"No stream found in sponsor page, trying direct play (will likely fail).")
+             self.logger.warning("No stream found in sponsor page, trying direct play (will likely fail).")
              list_item = xbmcgui.ListItem(path=url); list_item.setProperty('IsPlayable', 'true')
              return xbmcplugin.setResolvedUrl(self.addon_handle, True, list_item)
 

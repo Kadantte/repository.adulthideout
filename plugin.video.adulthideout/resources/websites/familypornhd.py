@@ -302,7 +302,6 @@ class FamilyPornHD(BaseWebsite):
             )
             return
 
-        import xbmc
         header_str = urllib.parse.urlencode(play_headers or {})
         play_url = stream_url
         if header_str and "|" not in play_url:

@@ -8,12 +8,9 @@ from io import BytesIO
 import gzip
 import html
 import xbmc
-import xbmcaddon
 import xbmcgui
 import xbmcplugin
-import xbmcvfs
 import sys
-import os
 from resources.lib.base_website import BaseWebsite
 from resources.lib.lookup_info import choose_and_open, extract_html_items
 
@@ -528,7 +525,7 @@ class XvideosWebsite(BaseWebsite):
                 ]
                 listname = f"{title} [COLOR lime]({duration})[/COLOR]"
                 self.add_link(listname, video_url, 4, thumb, self.fanart, context_menu)
-        except Exception as e:
+        except Exception:
             self.notify_error("Failed to parse related videos")
             
         self.end_directory()

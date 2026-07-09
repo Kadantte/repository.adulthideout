@@ -363,12 +363,6 @@ class AllPornStream(BaseWebsite):
     def select_directory_options(self, original_url=None):
         section = self._directory_section_from_url(original_url or "", "actors")
         params = self._directory_params(original_url or self._directory_url(section))
-        sort_labels = {
-            "count": "Video Count",
-            "likes": "Like Count",
-            "views": "View Count",
-            "alphabetical": "Alphabetical",
-        }
         choices = [
             "Sort: Video Count",
             "Sort: Like Count",

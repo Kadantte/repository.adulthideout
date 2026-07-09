@@ -220,7 +220,6 @@ class Pornwhite(BaseWebsite):
 
     def select_pornstar_sort(self, original_url=None):
         labels = [label for label, _ in self.pornstar_sort_options]
-        current_url = original_url or urllib.parse.urljoin(self.base_url, "/pornstars/")
         idx = xbmcgui.Dialog().select("Sort Pornstars by...", labels)
         if idx == -1:
             return

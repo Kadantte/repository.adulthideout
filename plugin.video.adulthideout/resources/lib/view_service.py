@@ -1,6 +1,5 @@
 # -*- coding: utf-8 -*-
 
-import os
 import sys
 import time
 
@@ -16,11 +15,12 @@ if ADDON_PATH and ADDON_PATH not in sys.path:
     sys.path.insert(0, ADDON_PATH)
 
 from resources.lib.view_utils import apply_view_mode
+from resources.lib.thumb_proxy import ThumbProxy
 
 
 RUNNING_PROPERTY = "AdultHideout.ViewServiceRunning"
 VERSION_PROPERTY = "AdultHideout.ViewServiceVersion"
-SERVICE_VERSION = "9"
+SERVICE_VERSION = "16"
 PENDING_SECONDS = 60
 
 
@@ -90,8 +90,11 @@ def run():
     window.setProperty(RUNNING_PROPERTY, "true")
     window.setProperty(VERSION_PROPERTY, SERVICE_VERSION)
     monitor = ViewSettingsMonitor()
-    _log("started")
+    thumb_proxy = ThumbProxy()
     try:
+        if not thumb_proxy.start():
+            _log("thumbnail proxy unavailable", xbmc.LOGWARNING)
+        _log("started")
         while not monitor.abortRequested():
             monitor._mark_pending_if_changed()
 
@@ -112,6 +115,7 @@ def run():
             if monitor.waitForAbort(0.5):
                 break
     finally:
+        thumb_proxy.stop()
         window.clearProperty(RUNNING_PROPERTY)
         window.clearProperty(VERSION_PROPERTY)
         _log("stopped")

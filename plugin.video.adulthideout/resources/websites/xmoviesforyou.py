@@ -14,10 +14,8 @@ if vendor_path not in sys.path:
 
 import cloudscraper
 
-import xbmc
 import xbmcgui
 import xbmcplugin
-import xbmcaddon
 from resources.lib.base_website import BaseWebsite
 
 

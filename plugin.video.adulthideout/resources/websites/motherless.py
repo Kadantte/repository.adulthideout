@@ -8,7 +8,6 @@ import urllib.request
 import html
 import http.cookiejar
 import xbmc
-import xbmcaddon
 import xbmcgui
 import xbmcplugin
 from resources.lib.base_website import BaseWebsite

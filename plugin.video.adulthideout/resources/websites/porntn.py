@@ -1,6 +1,10 @@
-import re, sys, urllib.parse, urllib.request, html
+import re
+import urllib.parse
+import urllib.request
+import html
 from http.cookiejar import CookieJar
-import xbmc, xbmcgui, xbmcplugin
+import xbmcgui
+import xbmcplugin
 from resources.lib.base_website import BaseWebsite
 
 class PorntnWebsite(BaseWebsite):

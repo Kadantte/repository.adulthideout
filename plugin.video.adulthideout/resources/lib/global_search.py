@@ -106,10 +106,6 @@ SOURCE_PRESETS = [
         "chaturbate", "camgirlfap", "archivebate", "camcaps", "erome",
         "motherless", "thisvid",
     ]),
-    ("new_1012", "1.0.12 New Sites", [
-        "allowflash", "notfans", "wowxxx", "xxthots", "sextb", "porn4fans",
-        "yespornvip", "tgtsporn", "pornmedium", "hqpornero",
-    ]),
 ]
 
 PROFILE_OVERRIDES = {
@@ -165,6 +161,11 @@ class GlobalSearch:
         self.default_icon = os.path.join(self.logos_dir, "icon.png")
         self.search_icon = os.path.join(self.logos_dir, "search.png")
         self.fanart = os.path.join(self.logos_dir, "fanart.jpg")
+        self._state_cache = None
+        try:
+            self._logo_names = set(os.listdir(self.logos_dir))
+        except OSError:
+            self._logo_names = set()
 
     def _state_path(self):
         if not xbmcvfs.exists(self.profile_path):
@@ -172,19 +173,30 @@ class GlobalSearch:
         return os.path.join(self.profile_path, "global_search.json")
 
     def _load_state(self):
+        if isinstance(self._state_cache, dict):
+            return self._state_cache
         try:
             with open(self._state_path(), "r") as handle:
                 state = json.load(handle)
-                if isinstance(state, dict):
-                    return state
         except Exception:
-            pass
-        return {}
+            self._state_cache = {}
+            return self._state_cache
+        if not isinstance(state, dict):
+            self._state_cache = {}
+            return self._state_cache
+        if state.get("profile") == "new_1012":
+            state["profile"] = "balanced"
+            state["sources"] = list(DEFAULT_SOURCES)
+            state.pop("custom_label", None)
+            self._save_state(state)
+        self._state_cache = state
+        return state
 
     def _save_state(self, state):
         try:
             with open(self._state_path(), "w") as handle:
                 json.dump(state, handle)
+            self._state_cache = state
         except Exception as exc:
             self.logger("Could not save global search state: {}".format(exc), xbmc.LOGWARNING)
 
@@ -196,7 +208,7 @@ class GlobalSearch:
         presets = self._load_state().get("custom_presets")
         return presets if isinstance(presets, dict) else {}
 
-    def _remember_query(self, query):
+    def _remember_query(self, query, search_mode="selected"):
         state = self._load_state()
         history = state.get("history")
         if not isinstance(history, list):
@@ -206,7 +218,18 @@ class GlobalSearch:
         history.insert(0, query)
         state["history"] = history[:20]
         state["last_query"] = query
+        history_modes = state.get("history_modes")
+        if not isinstance(history_modes, dict):
+            history_modes = {}
+        history_modes[query] = search_mode
+        state["history_modes"] = {key: history_modes[key] for key in history[:20] if key in history_modes}
         self._save_state(state)
+
+    def _history_mode(self, query):
+        history_modes = self._load_state().get("history_modes")
+        if isinstance(history_modes, dict):
+            return history_modes.get(query, "selected")
+        return "selected"
 
     def _cache_key(self, query, search_mode="selected"):
         signature = "|".join(
@@ -235,6 +258,7 @@ class GlobalSearch:
             matches = [
                 value for key, value in cache.items()
                 if key.startswith(prefix) and isinstance(value, dict)
+                and value.get("search_mode", search_mode) == search_mode
             ]
             if matches:
                 matches.sort(key=lambda item: item.get("saved_at", 0), reverse=True)
@@ -317,9 +341,8 @@ class GlobalSearch:
 
     def _source_icon(self, name):
         for filename in ("{}.png".format(name), "{}.png".format(name.replace("_", "-"))):
-            path = os.path.join(self.logos_dir, filename)
-            if xbmcvfs.exists(path):
-                return path
+            if filename in self._logo_names:
+                return os.path.join(self.logos_dir, filename)
         return self.default_icon
 
     def _search_mode_label(self, search_mode):
@@ -357,14 +380,18 @@ class GlobalSearch:
         if history:
             self._add_dir("[COLOR red]Clear Search History[/COLOR]", "clear_history", self.search_icon)
         for query in history:
-            context_url = "{}?mode=20&website=global_search&action=edit_search&query={}".format(
-                sys_argv0(), urllib.parse.quote_plus(query)
+            entry_mode = self._history_mode(query)
+            context_url = "{}?mode=20&website=global_search&action=edit_search&query={}&search_mode={}".format(
+                sys_argv0(), urllib.parse.quote_plus(query), urllib.parse.quote_plus(entry_mode)
             )
-            label = "[COLOR yellow]{}[/COLOR]".format(query)
+            mode_suffix = " [COLOR grey](all sites)[/COLOR]" if entry_mode == "deep" else ""
+            label = "[COLOR yellow]{}[/COLOR]{}".format(query, mode_suffix)
             item = xbmcgui.ListItem(label)
             item.setArt({"thumb": self.search_icon, "icon": self.search_icon, "fanart": self.fanart})
             item.addContextMenuItems([("Edit", "RunPlugin({})".format(context_url))])
-            url = "{}?mode=21&website=global_search&query={}&search_mode=selected".format(sys_argv0(), urllib.parse.quote_plus(query))
+            url = "{}?mode=21&website=global_search&query={}&search_mode={}".format(
+                sys_argv0(), urllib.parse.quote_plus(query), urllib.parse.quote_plus(entry_mode)
+            )
             xbmcplugin.addDirectoryItem(self.addon_handle, url, item, True)
         end_directory_with_view(self.addon_handle, self.addon)
 
@@ -383,7 +410,7 @@ class GlobalSearch:
         new_query = keyboard.getText().strip()
         if not new_query:
             return self.show_menu()
-        self._remember_query(new_query)
+        self._remember_query(new_query, search_mode=search_mode)
         self._open_results(new_query, refresh=True, search_mode=search_mode)
 
     def refresh_search(self, query, page=1, search_mode="selected"):
@@ -623,7 +650,7 @@ class GlobalSearch:
         query = keyboard.getText().strip()
         if not query:
             return self.show_menu()
-        self._remember_query(query)
+        self._remember_query(query, search_mode=search_mode)
         self._open_results(query, refresh=True, search_mode=search_mode)
 
     def _open_results(self, query, refresh=False, page=1, search_mode="selected"):
@@ -783,7 +810,7 @@ class GlobalSearch:
         query = (query or "").strip()
         if not query:
             return self.show_menu()
-        self._remember_query(query)
+        self._remember_query(query, search_mode=search_mode)
         refresh = bool(refresh) or self._consume_refresh_once(query)
         if not refresh and self.show_cached_results(query, page, search_mode=search_mode):
             return

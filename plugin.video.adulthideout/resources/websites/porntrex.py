@@ -1,11 +1,8 @@
 import re
 import urllib.parse
-import json
 import xbmcgui
 import xbmcplugin
 import xbmcaddon
-import xbmc
-import xbmcvfs
 import sys
 import os
 import html
@@ -72,7 +69,6 @@ class PornTrex(BaseWebsite):
                 thumb = "https:" + thumb
                 
             duration = ""
-            dur_match = re.search(r'class=\"duration\"[^>]*>([\d:]+)</div>', html_content)
 
             videos.append({
                 "title": html.unescape(title.strip()),

@@ -10,7 +10,6 @@ import xbmcaddon
 import os
 import hashlib
 import time
-import json
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from resources.lib.base_website import BaseWebsite
 

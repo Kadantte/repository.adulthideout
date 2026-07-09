@@ -4,7 +4,6 @@ import urllib.parse
 import xbmcgui
 import xbmcplugin
 import xbmcaddon
-import xbmc
 import xbmcvfs
 import sys
 import os

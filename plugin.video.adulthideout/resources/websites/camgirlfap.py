@@ -113,7 +113,6 @@ class CamgirlFap(KVSTubeWebsite):
         if not is_mp4:
             self.logger.warning("[camgirlfap] Skipping non-MP4 stream candidate")
             return False
-        has_quality = bool(re.search(r"_\d{3,4}p\.mp4/?(?:$|\?)", url, re.IGNORECASE))
         try:
             headers = self._headers(referer, accept="*/*")
             headers["Range"] = "bytes=0-4095"

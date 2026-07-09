@@ -1,16 +1,36 @@
 #!/usr/bin/env python
 
+import os
 import re
 import sys
+import threading
 import urllib.parse
-import urllib.request
-import http.cookiejar
 import xbmc
+import xbmcaddon
 import xbmcgui
 import xbmcplugin
 import html
 from resources.lib.base_website import BaseWebsite
 from resources.lib.lookup_info import choose_and_open, extract_html_items
+
+try:
+    addon_path = xbmcaddon.Addon().getAddonInfo('path')
+    vendor_path = os.path.join(addon_path, 'resources', 'lib', 'vendor')
+    if vendor_path not in sys.path:
+        sys.path.insert(0, vendor_path)
+except Exception as e:
+    xbmc.log(f"[AdultHideout] Vendor path inject failed in spankbang.py: {e}", xbmc.LOGERROR)
+
+try:
+    import cloudscraper
+    _HAS_CF = True
+except Exception as e:
+    xbmc.log(f"[Spankbang] cloudscraper import failed: {e}", xbmc.LOGERROR)
+    _HAS_CF = False
+
+_SESSION_CACHE = None
+_SESSION_LOCK = threading.Lock()
+
 
 class Spankbang(BaseWebsite):
     def __init__(self, addon_handle):
@@ -37,24 +57,77 @@ class Spankbang(BaseWebsite):
         
         self.model_sort_options = ["Trending", "Alphabetical"]
         self.model_sort_paths = {"Trending": "pornstars", "Alphabetical": "pornstars_alphabet"}
-        
-        self.cookie_jar = http.cookiejar.CookieJar()
-        self.opener = urllib.request.build_opener(urllib.request.HTTPCookieProcessor(self.cookie_jar))
-        self.opener.addheaders = [
-            ('User-Agent', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/129.0.0.0 Safari/537.36'),
-            ('Accept', 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8'),
-            ('Accept-Language', 'en-US,en;q=0.9')
-        ]
-        
+
+        self._scraper_ua = (
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
+            "(KHTML, like Gecko) Chrome/129.0.0.0 Safari/537.36"
+        )
+        self.scraper = None
+
         self._set_orientation_cookie()
 
-    def _get_html(self, url):
+    def get_session(self):
+        """
+        Cloudflare's managed challenge on spankbang.com blocks plain urllib/requests
+        (some regions, e.g. Germany, get a stricter bot-check tied to age-verification
+        rules). cloudscraper solves it; a global cache reuses the session across calls.
+        """
+        global _SESSION_CACHE
+
+        with _SESSION_LOCK:
+            if self.scraper:
+                return self.scraper
+            if _SESSION_CACHE:
+                self.scraper = _SESSION_CACHE
+                return self.scraper
+            self.scraper = self._new_session()
+            _SESSION_CACHE = self.scraper
+            return self.scraper
+
+    def _new_session(self):
+        if not _HAS_CF:
+            self.logger.error("Cloudscraper library is not available.")
+            return None
         try:
-            with self.opener.open(url, timeout=15) as response:
-                return response.read().decode('utf-8', errors='ignore')
+            scraper = cloudscraper.create_scraper(browser={'custom': self._scraper_ua})
+            scraper.headers.update({
+                'User-Agent': self._scraper_ua,
+                'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
+                'Accept-Language': 'en-US,en;q=0.9',
+            })
+            return scraper
         except Exception as e:
-            self.logger.error(f"Fehler beim Abrufen der URL {url}: {e}")
-            return ""
+            self.logger.error(f"Failed to create scraper session: {e}")
+            return None
+
+    def _get_html(self, url):
+        global _SESSION_CACHE
+        # Cloudflare alternates between a legacy JS challenge (cloudscraper solves it)
+        # and a stricter managed challenge (it can't) - a fresh session sometimes draws
+        # the solvable one, so retry a couple of times with a new session on 403.
+        attempts = 5
+        last_error = ""
+        for attempt in range(attempts):
+            scraper = self.get_session()
+            if not scraper:
+                return ""
+            try:
+                response = scraper.get(url, timeout=20)
+                if response.status_code == 403:
+                    last_error = "403 Forbidden (Cloudflare challenge)"
+                    with _SESSION_LOCK:
+                        self.scraper = None
+                        _SESSION_CACHE = None
+                    continue
+                response.raise_for_status()
+                return response.text
+            except Exception as e:
+                last_error = str(e)
+                with _SESSION_LOCK:
+                    self.scraper = None
+                    _SESSION_CACHE = None
+        self.logger.error(f"Fehler beim Abrufen der URL {url}: {last_error}")
+        return ""
 
     def _set_orientation_cookie(self):
         try:

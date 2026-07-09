@@ -7,7 +7,6 @@ import urllib.parse
 import urllib.request
 import html
 import xbmc
-import xbmcaddon
 import xbmcgui
 import xbmcplugin
 import json

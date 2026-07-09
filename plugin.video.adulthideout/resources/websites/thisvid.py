@@ -7,6 +7,7 @@ import xbmc
 import xbmcgui
 import xbmcplugin
 from resources.lib.base_website import BaseWebsite
+from resources.lib.proxy_utils import PlaybackGuard, ProxyController
 
 class ThisVidWebsite(BaseWebsite):
     def __init__(self, addon_handle, addon=None):
@@ -207,11 +208,43 @@ class ThisVidWebsite(BaseWebsite):
                         video_url = er2_match.group(1)
                 
                 if video_url:
-                    li = xbmcgui.ListItem(path=video_url)
-                    xbmcplugin.setResolvedUrl(self.addon_handle, True, li)
-                    return
+                    headers = {
+                        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) '
+                                      'AppleWebKit/537.36 (KHTML, like Gecko) '
+                                      'Chrome/120.0.0.0 Safari/537.36',
+                        'Referer': embed_url,
+                        'Origin': self.base_url,
+                        'Accept-Encoding': 'identity',
+                    }
+                    try:
+                        controller = ProxyController(
+                            video_url,
+                            upstream_headers=headers,
+                            use_urllib=True,
+                            probe_size=True,
+                        )
+                        local_url = controller.start()
+                        PlaybackGuard(
+                            xbmc.Player(), xbmc.Monitor(), local_url, controller
+                        ).start()
+
+                        li = xbmcgui.ListItem(path=local_url)
+                        li.setProperty('IsPlayable', 'true')
+                        li.setMimeType('video/mp4')
+                        li.setContentLookup(False)
+                        xbmcplugin.setResolvedUrl(self.addon_handle, True, li)
+                        return
+                    except Exception as exc:
+                        self.logger.error(f'ThisVid proxy playback failed: {exc}')
+                        try:
+                            controller.stop()
+                        except Exception:
+                            pass
 
         self.notify_error("No video found")
+        xbmcplugin.setResolvedUrl(
+            self.addon_handle, False, xbmcgui.ListItem()
+        )
 
     def process_categories(self, url):
         is_gay = 'tab=gay' in url

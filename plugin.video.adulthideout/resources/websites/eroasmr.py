@@ -61,8 +61,8 @@ class EroASMR(BaseWebsite):
             sort_index = 0
         
         if sort_index == 1:
-            return "https://eroasmr.com/top-100-porn-asmr-videos-of-all-time/", f"EroASMR - Top 100"
-        return self.base_url, f"EroASMR - Newest"
+            return "https://eroasmr.com/top-100-porn-asmr-videos-of-all-time/", "EroASMR - Top 100"
+        return self.base_url, "EroASMR - Newest"
 
     def make_request(self, url):
         try:

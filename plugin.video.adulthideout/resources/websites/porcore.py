@@ -1,11 +1,9 @@
 
 import re
-import sys
 import urllib.parse
 import urllib.request
 import xbmcgui
 import xbmcplugin
-import xbmc
 from resources.lib.base_website import BaseWebsite
 
 class PorcoreWebsite(BaseWebsite):
@@ -24,10 +22,10 @@ class PorcoreWebsite(BaseWebsite):
         sort_index = int(self.addon.getSetting(setting_id) or '0')
         
         if sort_index == 1:
-            return f"{self.base_url}/videos/most-viewed/", f"Porcore - Most Viewed"
+            return f"{self.base_url}/videos/most-viewed/", "Porcore - Most Viewed"
         elif sort_index == 2:
-            return f"{self.base_url}/videos/top-rated/", f"Porcore - Top Rated"
-        return self.base_url, f"Porcore - Newest"
+            return f"{self.base_url}/videos/top-rated/", "Porcore - Top Rated"
+        return self.base_url, "Porcore - Newest"
 
     def make_request(self, url):
         try:

@@ -3,7 +3,6 @@
 
 import html
 import re
-import sys
 import urllib.parse
 
 import requests

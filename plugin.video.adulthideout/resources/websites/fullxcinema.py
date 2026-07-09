@@ -7,11 +7,9 @@ import urllib.parse
 import html
 import json
 import base64
-import xbmc
 import xbmcaddon
 import xbmcgui
 import xbmcplugin
-import xbmcvfs
 
 try:
     addon_path = xbmcaddon.Addon().getAddonInfo('path')

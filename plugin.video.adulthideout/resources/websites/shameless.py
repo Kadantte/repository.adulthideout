@@ -1,11 +1,9 @@
 
 import re
-import sys
 import urllib.parse
 import urllib.request
 import xbmcgui
 import xbmcplugin
-import xbmc
 from resources.lib.base_website import BaseWebsite
 
 class ShamelessWebsite(BaseWebsite):
@@ -24,10 +22,10 @@ class ShamelessWebsite(BaseWebsite):
         sort_index = int(self.addon.getSetting(setting_id) or '0')
         
         if sort_index == 1:
-            return f"{self.base_url}/most-popular/", f"Shameless - Most Popular"
+            return f"{self.base_url}/most-popular/", "Shameless - Most Popular"
         elif sort_index == 2:
-            return f"{self.base_url}/top-rated/", f"Shameless - Top Rated"
-        return f"{self.base_url}/latest-updates/", f"Shameless - Newest"
+            return f"{self.base_url}/top-rated/", "Shameless - Top Rated"
+        return f"{self.base_url}/latest-updates/", "Shameless - Newest"
 
     def make_request(self, url):
         try:

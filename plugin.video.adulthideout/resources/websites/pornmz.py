@@ -1,12 +1,9 @@
 
 import re
 import urllib.parse
-import json
 import xbmcgui
 import xbmcplugin
 import xbmcaddon
-import xbmc
-import xbmcvfs
 import sys
 import os
 import html

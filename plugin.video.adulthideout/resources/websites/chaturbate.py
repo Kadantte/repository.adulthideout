@@ -1,6 +1,5 @@
 # -*- coding: utf-8 -*-
 import html
-import os
 import re
 import socket
 import sys
@@ -15,7 +14,6 @@ import requests
 import xbmc
 import xbmcgui
 import xbmcplugin
-import xbmcvfs
 
 from resources.lib.base_website import BaseWebsite
 

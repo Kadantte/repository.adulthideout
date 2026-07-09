@@ -5,7 +5,6 @@ import json
 import urllib.parse
 import urllib.request
 import xbmc
-import xbmcaddon
 import xbmcgui
 import xbmcplugin
 from resources.lib.base_website import BaseWebsite

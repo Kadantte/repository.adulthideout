@@ -1,12 +1,9 @@
 
 import re
-import time
 import sys
 import os
 import urllib.parse
 from resources.lib.base_website import BaseWebsite
-import json
-import traceback
 
 import xbmcaddon
 
@@ -199,7 +196,6 @@ class Fuqer(BaseWebsite):
             video_url = match.group(1).replace(r'\/', '/')
             xbmc.log(f"[Fuqer][Resolve] Found defaultRaw: {video_url}", xbmc.LOGINFO)
             
-            import requests
             
             try:
                 r = self.scraper.request("GET", "https://www.fuqer.com/secure_link.php", 

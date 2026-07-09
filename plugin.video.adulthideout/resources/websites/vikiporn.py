@@ -8,12 +8,10 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 import html
 import hashlib
 import xbmc
-import xbmcaddon
 import xbmcgui
 import xbmcplugin
 import xbmcvfs
 import os
-import sys
 from resources.lib.base_website import BaseWebsite
 
 

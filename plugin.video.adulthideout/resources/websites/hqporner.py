@@ -7,8 +7,6 @@ import http.cookiejar
 import xbmc
 import xbmcgui
 import xbmcplugin
-import xbmcvfs
-import os
 
 from resources.lib.base_website import BaseWebsite
 from resources.lib.lookup_info import choose_and_open, extract_html_items

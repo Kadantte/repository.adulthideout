@@ -14,6 +14,8 @@ import xbmcvfs
 import html
 from resources.lib.view_utils import end_directory_with_view
 
+_ICON_PATH_CACHE = {}
+
 class KodiLogHandler(logging.Handler):
     def emit(self, record):
         levels = {
@@ -41,18 +43,24 @@ class BaseWebsite:
             self.logger.addHandler(handler)
         self.fanart = os.path.join(self.addon.getAddonInfo('path'), 'resources', 'logos', 'fanart.jpg')
         self.icon = os.path.join(self.addon.getAddonInfo('path'), 'resources', 'logos', 'icon.png')
-        self.icons = {
-            'default': self.icon,
-            'search': os.path.join(self.addon.getAddonInfo('path'), 'resources', 'logos', 'search.png'),
-            'categories': os.path.join(self.addon.getAddonInfo('path'), 'resources', 'logos', 'categories.png'),
-            'pornstars': os.path.join(self.addon.getAddonInfo('path'), 'resources', 'logos', 'pornstars.png'),
-            'settings': os.path.join(self.addon.getAddonInfo('path'), 'resources', 'logos', 'settings.png'),
-            'groups': os.path.join(self.addon.getAddonInfo('path'), 'resources', 'logos', 'icon.png'),
-            'galleries': os.path.join(self.addon.getAddonInfo('path'), 'resources', 'logos', 'icon.png'),            
-        }
-        for key, path in self.icons.items():
-            if not xbmcvfs.exists(path):
-                self.logger.warning(f"Icon not found: {path}")
+        addon_path = self.addon.getAddonInfo('path')
+        cached_icons = _ICON_PATH_CACHE.get(addon_path)
+        if cached_icons is None:
+            logo_path = os.path.join(addon_path, 'resources', 'logos')
+            cached_icons = {
+                'default': self.icon,
+                'search': os.path.join(logo_path, 'search.png'),
+                'categories': os.path.join(logo_path, 'categories.png'),
+                'pornstars': os.path.join(logo_path, 'pornstars.png'),
+                'settings': os.path.join(logo_path, 'settings.png'),
+                'groups': self.icon,
+                'galleries': self.icon,
+            }
+            for key, path in cached_icons.items():
+                if not xbmcvfs.exists(path):
+                    self.logger.warning(f"Icon not found: {path}")
+            _ICON_PATH_CACHE[addon_path] = cached_icons
+        self.icons = dict(cached_icons)
 
     def get_start_url_and_label(self):
         label = f"{self.name.capitalize()}"
@@ -109,14 +117,6 @@ class BaseWebsite:
         self.addon.setSetting(f"{self.name}_sort_by", str(idx))
         
         new_url, _ = self.get_start_url_and_label()
-        
-        if original_url:
-            parsed_original = urllib.parse.urlparse(original_url)
-            parsed_new = urllib.parse.urlparse(new_url)
-            
-            original_path = parsed_original.path.strip('/')
-            if 'cat/' in original_path or 'search/' in original_path:
-                 pass
 
         xbmc.executebuiltin(f"Container.Update({sys.argv[0]}?mode=2&url={urllib.parse.quote_plus(new_url)}&website={self.name},replace)")
 

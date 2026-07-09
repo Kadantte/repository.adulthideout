@@ -2,12 +2,10 @@
 import html
 import os
 import re
-import sys
 import urllib.parse
 import requests
 import xbmcgui
 import xbmcplugin
-import xbmcaddon
 
 from resources.lib.base_website import BaseWebsite
 from resources.lib.resolvers import resolver

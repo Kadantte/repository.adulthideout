@@ -46,7 +46,7 @@ class DaftpornWebsite(BaseWebsite):
             return response.text
         except Exception as e:
             self.logger.error(f"Request failed for {url}: {e}")
-            self.notify_error(f"Failed to fetch URL")
+            self.notify_error("Failed to fetch URL")
             return None
 
     def process_content(self, url):

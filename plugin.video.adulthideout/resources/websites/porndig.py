@@ -6,11 +6,9 @@ import xbmcgui
 import xbmcplugin
 import xbmcaddon
 import xbmc
-import xbmcvfs
 import sys
 import os
 import html
-from concurrent.futures import ThreadPoolExecutor, as_completed
 
 try:
     addon_path = xbmcaddon.Addon().getAddonInfo('path')

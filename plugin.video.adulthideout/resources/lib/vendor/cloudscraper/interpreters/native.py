@@ -3,7 +3,6 @@ from __future__ import absolute_import
 import ast
 import re
 import operator as op
-import pyparsing
 
 from ..exceptions import CloudflareSolveError
 from . import JavaScriptInterpreter
@@ -18,6 +17,61 @@ _OP_MAP = {
     ast.Invert: op.neg,
 }
 
+
+def _flatten_nested_expression(expression):
+    """Return pyparsing.nestedExpr-compatible flat tokens for JSFuck math."""
+    start = expression.find('(')
+    if start < 0:
+        return [expression]
+
+    def parse_group(index):
+        tokens = []
+        chunk = []
+        quote = None
+        escaped = False
+
+        def flush():
+            token = ''.join(chunk).strip()
+            if token:
+                tokens.append(token)
+            del chunk[:]
+
+        while index < len(expression):
+            char = expression[index]
+            if quote:
+                chunk.append(char)
+                if escaped:
+                    escaped = False
+                elif char == '\\':
+                    escaped = True
+                elif char == quote:
+                    quote = None
+                    flush()
+                index += 1
+                continue
+            if char in ('"', "'"):
+                flush()
+                quote = char
+                chunk.append(char)
+            elif char == '(':
+                flush()
+                nested, index = parse_group(index + 1)
+                tokens.extend(nested)
+                continue
+            elif char == ')':
+                flush()
+                return tokens, index + 1
+            elif char.isspace():
+                flush()
+            else:
+                chunk.append(char)
+            index += 1
+        flush()
+        return tokens, index
+
+    tokens, _ = parse_group(start + 1)
+    return tokens
+
 # ------------------------------------------------------------------------------- #
 
 
@@ -30,6 +84,13 @@ class Calc(ast.NodeVisitor):
 
     def visit_Num(self, node):
         return node.n
+
+    # ------------------------------------------------------------------------------- #
+
+    def visit_Constant(self, node):
+        # Python 3.12+ no longer emits ast.Num for numeric literals (deprecated
+        # since 3.8, removed from the parser output) - ast.Constant covers both.
+        return node.value
 
     # ------------------------------------------------------------------------------- #
 
@@ -100,11 +161,6 @@ class ChallengeInterpreter(JavaScriptInterpreter):
 
         # ------------------------------------------------------------------------------- #
 
-        def flatten(lists):
-            return sum(map(flatten, lists), []) if isinstance(lists, list) else [lists]
-
-        # ------------------------------------------------------------------------------- #
-
         def jsfuckToNumber(jsFuck):
             # "Clean Up" JSFuck
             jsFuck = jsFuck.replace('!+[]', '1').replace('!![]', '1').replace('[]', '0')
@@ -115,7 +171,7 @@ class ChallengeInterpreter(JavaScriptInterpreter):
             stack = []
             bstack = []
 
-            for i in flatten(pyparsing.nestedExpr().parseString(jsFuck).asList()):
+            for i in _flatten_nested_expression(jsFuck):
                 if i == '+':
                     stack.append(bstack)
                     bstack = []

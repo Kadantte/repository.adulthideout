@@ -10,7 +10,6 @@ import xbmc
 import xbmcaddon
 import threading
 import socket
-import json
 import re
 import ssl
 import time
@@ -48,7 +47,7 @@ DEFAULT_CHUNK = 512 * 1024  # Für requests-Backend (bleibt wie gehabt)
 # Read-Timeout für laufende urllib-Streams: Kodis curl gibt nach 20s ohne
 # Bytes auf ("Timeout was reached(28)"). Wir brechen VORHER ab, damit Kodi
 # sauber neu verbindet statt einzufrieren.
-STREAM_READ_TIMEOUT = 15
+STREAM_READ_TIMEOUT = 18
 
 # KVS-CDNs (get_file-Links) erlauben pro Token typischerweise 2 parallele
 # Verbindungen — die dritte bekommt zwar Response-Header, aber der Body
@@ -119,13 +118,13 @@ class _UrllibUpstream:
         self._host_ip_map = {}  # hostname -> ip
         self._pre_resolve(url)
         
-        xbmc.log(f"[AHProxy-urllib] Upstream URL: {url[:200]}", xbmc.LOGINFO)
+        xbmc.log(f"[AHProxy-urllib] Upstream URL: {url[:200]}", xbmc.LOGDEBUG)
         
         # HEAD-Request um Dateigröße zu ermitteln (Kodi braucht das für Seeks)
         if probe_size:
             self._probe_size()
         else:
-            xbmc.log("[AHProxy-urllib] Skipping startup size probe", xbmc.LOGINFO)
+            xbmc.log("[AHProxy-urllib] Skipping startup size probe", xbmc.LOGDEBUG)
 
     def _pre_resolve(self, url):
         """Löst den Hostnamen aus der URL einmalig auf und speichert die IP."""
@@ -135,7 +134,7 @@ class _UrllibUpstream:
             if host and not re.match(r'^\d+\.\d+\.\d+\.\d+$', host):
                 ip = socket.gethostbyname(host)
                 self._host_ip_map[host] = ip
-                xbmc.log(f"[AHProxy-urllib] Pre-resolved {host} -> {ip}", xbmc.LOGINFO)
+                xbmc.log(f"[AHProxy-urllib] Pre-resolved {host} -> {ip}", xbmc.LOGDEBUG)
         except Exception as e:
             xbmc.log(f"[AHProxy-urllib] Pre-resolve failed: {e}", xbmc.LOGWARNING)
 
@@ -170,18 +169,18 @@ class _UrllibUpstream:
             cl = resp.headers.get('Content-Length')
             if cl:
                 self.total_size = int(cl)
-                xbmc.log(f"[AHProxy-urllib] Total file size: {self.total_size} bytes", xbmc.LOGINFO)
+                xbmc.log(f"[AHProxy-urllib] Total file size: {self.total_size} bytes", xbmc.LOGDEBUG)
             resp.close()
         except Exception as e:
             self._head_failed = True
-            xbmc.log(f"[AHProxy-urllib] HEAD probe failed ({e}). Trying GET Range probe...", xbmc.LOGINFO)
+            xbmc.log(f"[AHProxy-urllib] HEAD probe failed ({e}). Trying GET Range probe...", xbmc.LOGDEBUG)
             try:
                 req = self._build_request(self.url, {'Range': 'bytes=0-1'})
                 resp = urllib.request.urlopen(req, timeout=10, context=self._ssl_ctx)
                 cr = resp.headers.get('Content-Range')
                 if cr and '/' in cr:
                     self.total_size = int(cr.split('/')[-1].strip())
-                    xbmc.log(f"[AHProxy-urllib] Total file size (via GET probe): {self.total_size} bytes", xbmc.LOGINFO)
+                    xbmc.log(f"[AHProxy-urllib] Total file size (via GET probe): {self.total_size} bytes", xbmc.LOGDEBUG)
                 resp.close()
             except Exception as e2:
                 xbmc.log(f"[AHProxy-urllib] GET Range probe failed: {e2}", xbmc.LOGWARNING)
@@ -273,18 +272,18 @@ class _UrllibUpstream:
     
     def make_head(self, extra=None, timeout=15):
         if self._head_failed:
-            xbmc.log("[AHProxy-urllib] Skipping HEAD request due to previous failure. Using GET Range 0-1.", xbmc.LOGINFO)
+            xbmc.log("[AHProxy-urllib] Skipping HEAD request due to previous failure. Using GET Range 0-1.", xbmc.LOGDEBUG)
             return self._make_head_via_get(extra, timeout)
             
         req = self._build_request(self.url, extra)
         req.get_method = lambda: 'HEAD'
-        xbmc.log(f"[AHProxy-urllib] HEAD {self.url[:120]}", xbmc.LOGINFO)
+        xbmc.log(f"[AHProxy-urllib] HEAD {self.url[:120]}", xbmc.LOGDEBUG)
         try:
             # We enforce a short timeout (3s) for the HEAD request since a valid CDN should answer instantly
             head_timeout = min(timeout, 3)
             resp = urllib.request.urlopen(req, timeout=head_timeout, context=self._ssl_ctx)
             wrapped = _UrllibResponse(resp, total_size=self.total_size)
-            xbmc.log(f"[AHProxy-urllib] HEAD Response: {resp.status}", xbmc.LOGINFO)
+            xbmc.log(f"[AHProxy-urllib] HEAD Response: {resp.status}", xbmc.LOGDEBUG)
             return wrapped
         except Exception as e:
             self._head_failed = True
@@ -308,7 +307,7 @@ class _UrllibUpstream:
                     wrapped.status_code = 200
                     del wrapped.headers['Content-Range']
             
-            xbmc.log(f"[AHProxy-urllib] HEAD Fallback GET Response: {wrapped.status_code}", xbmc.LOGINFO)
+            xbmc.log(f"[AHProxy-urllib] HEAD Fallback GET Response: {wrapped.status_code}", xbmc.LOGDEBUG)
             return wrapped
         except urllib.error.HTTPError as e2:
             xbmc.log(f"[AHProxy-urllib] HEAD Fallback GET HTTP Error: {e2.code}", xbmc.LOGWARNING)
@@ -335,7 +334,7 @@ class _UrllibUpstream:
         if range_start and range_start > 0:
             xbmc.log(
                 f"[AHProxy-urllib] Seek Range={range_hdr}; closing old upstream streams first",
-                xbmc.LOGINFO,
+                xbmc.LOGDEBUG,
             )
             self._close_active()
         else:
@@ -344,7 +343,7 @@ class _UrllibUpstream:
         cancel_event = threading.Event()
         
         req = self._build_request(self.url, extra)
-        xbmc.log(f"[AHProxy-urllib] GET {self.url[:100]} Range={range_hdr}", xbmc.LOGINFO)
+        xbmc.log(f"[AHProxy-urllib] GET {self.url[:100]} Range={range_hdr}", xbmc.LOGDEBUG)
         try:
             # timeout wirkt als Socket-Timeout für connect UND jedes recv():
             # ein Stream, der >15s lang NULL Bytes liefert, bricht ab und
@@ -359,7 +358,7 @@ class _UrllibUpstream:
                 f"[AHProxy-urllib] Response: {resp.status}, "
                 f"Content-Length: {resp.headers.get('Content-Length', '?')}, "
                 f"Content-Range: {resp.headers.get('Content-Range', 'none')}",
-                xbmc.LOGINFO
+                xbmc.LOGDEBUG
             )
             return _UrllibResponse(resp, total_size=self.total_size, cancel_event=cancel_event)
         except urllib.error.HTTPError as e:
@@ -389,7 +388,7 @@ class _UrllibUpstream:
                             req_headers['Range'] = range_val
                         conn.request('GET', path, headers=req_headers)
                         raw_resp = conn.getresponse()
-                        xbmc.log(f"[AHProxy-urllib] DNS-fallback response: {raw_resp.status}", xbmc.LOGINFO)
+                        xbmc.log(f"[AHProxy-urllib] DNS-fallback response: {raw_resp.status}", xbmc.LOGDEBUG)
                         # Wrap in a urllib-compatible object
                         from urllib.response import addinfourl
                         import email.message
@@ -508,7 +507,7 @@ class _Upstream:
         self.resolved_url = None
         self.skip_resolve = skip_resolve
         self.total_size = None
-        xbmc.log(f"[AHProxy] Upstream URL: {url[:200]}", xbmc.LOGINFO)
+        xbmc.log(f"[AHProxy] Upstream URL: {url[:200]}", xbmc.LOGDEBUG)
 
         if session is not None:
             self.session = session
@@ -540,16 +539,16 @@ class _Upstream:
         if not skip_resolve:
             self._resolve_url()
         else:
-            xbmc.log("[AHProxy] Skipping URL resolution (skip_resolve=True)", xbmc.LOGINFO)
+            xbmc.log("[AHProxy] Skipping URL resolution (skip_resolve=True)", xbmc.LOGDEBUG)
 
     def _resolve_url(self):
         try:
-            xbmc.log("[AHProxy] Checking if URL needs resolution...", xbmc.LOGINFO)
+            xbmc.log("[AHProxy] Checking if URL needs resolution...", xbmc.LOGDEBUG)
             try:
                 head_resp = self.session.head(self.original_url, timeout=5, allow_redirects=True)
                 content_type = head_resp.headers.get('Content-Type', '').lower()
                 if 'video/' in content_type or 'octet-stream' in content_type:
-                    xbmc.log("[AHProxy] HEAD shows video content, no resolution needed", xbmc.LOGINFO)
+                    xbmc.log("[AHProxy] HEAD shows video content, no resolution needed", xbmc.LOGDEBUG)
                     cl = head_resp.headers.get('Content-Length')
                     if cl:
                         self.total_size = int(cl)
@@ -560,14 +559,14 @@ class _Upstream:
             resp = self.session.get(self.original_url, timeout=10, stream=False)
             
             content_type = resp.headers.get('Content-Type', '').lower()
-            xbmc.log(f"[AHProxy] Initial response: status={resp.status_code}, content-type={content_type}", xbmc.LOGINFO)
+            xbmc.log(f"[AHProxy] Initial response: status={resp.status_code}, content-type={content_type}", xbmc.LOGDEBUG)
             
             if 'application/json' in content_type:
-                xbmc.log("[AHProxy] URL returns JSON, parsing...", xbmc.LOGINFO)
+                xbmc.log("[AHProxy] URL returns JSON, parsing...", xbmc.LOGDEBUG)
                 try:
                     data = resp.json()
-                    xbmc.log(f"[AHProxy] JSON type: {type(data)}, length: {len(data) if isinstance(data, (list, dict)) else 'N/A'}", xbmc.LOGINFO)
-                    xbmc.log(f"[AHProxy] JSON data: {str(data)[:500]}", xbmc.LOGINFO)
+                    xbmc.log(f"[AHProxy] JSON type: {type(data)}, length: {len(data) if isinstance(data, (list, dict)) else 'N/A'}", xbmc.LOGDEBUG)
+                    xbmc.log(f"[AHProxy] JSON data: {str(data)[:500]}", xbmc.LOGDEBUG)
                     
                     video_url = None
                     
@@ -584,7 +583,7 @@ class _Upstream:
                             if item.get('defaultQuality') is True:
                                 best = item
                                 default_found = True
-                                xbmc.log(f"[AHProxy] Found default quality: {item.get('quality')}", xbmc.LOGINFO)
+                                xbmc.log(f"[AHProxy] Found default quality: {item.get('quality')}", xbmc.LOGDEBUG)
                                 break
                             
                             if not default_found:
@@ -599,7 +598,7 @@ class _Upstream:
                         
                         if best and 'videoUrl' in best:
                             video_url = best['videoUrl']
-                            xbmc.log(f"[AHProxy] Selected quality: {best.get('quality')}", xbmc.LOGINFO)
+                            xbmc.log(f"[AHProxy] Selected quality: {best.get('quality')}", xbmc.LOGDEBUG)
                     elif isinstance(data, dict) and 'url' in data:
                         video_url = data['url']
                     elif isinstance(data, dict) and 'videoUrl' in data:
@@ -616,7 +615,7 @@ class _Upstream:
                                     break
                     
                     if video_url:
-                        xbmc.log(f"[AHProxy] Resolved video URL: {video_url[:200]}", xbmc.LOGINFO)
+                        xbmc.log(f"[AHProxy] Resolved video URL: {video_url[:200]}", xbmc.LOGDEBUG)
                         self.resolved_url = video_url
                         return
                     else:
@@ -626,7 +625,7 @@ class _Upstream:
                 except Exception as e:
                     xbmc.log(f"[AHProxy] JSON parsing error: {e}", xbmc.LOGERROR)
             else:
-                xbmc.log("[AHProxy] URL returns video directly", xbmc.LOGINFO)
+                xbmc.log("[AHProxy] URL returns video directly", xbmc.LOGDEBUG)
         except Exception as e:
             xbmc.log(f"[AHProxy] URL resolution error: {e}", xbmc.LOGWARNING)
 
@@ -641,22 +640,22 @@ class _Upstream:
         resp = self.session.head(self.url, headers=h, allow_redirects=True, timeout=timeout)
         if not self.skip_resolve and resp.url != self.url:
             self.resolved_url = resp.url
-            xbmc.log(f"[AHProxy] Dynamically resolved redirected URL via HEAD: {self.resolved_url}", xbmc.LOGINFO)
+            xbmc.log(f"[AHProxy] Dynamically resolved redirected URL via HEAD: {self.resolved_url}", xbmc.LOGDEBUG)
         return resp
 
     def make_get(self, extra=None, stream=True, timeout=60):
         h = dict(getattr(self.session, "headers", {}) or {})
         if extra:
             h.update(extra)
-        xbmc.log(f"[AHProxy] GET request to {self.url[:100]} (stream={stream})", xbmc.LOGINFO)
+        xbmc.log(f"[AHProxy] GET request to {self.url[:100]} (stream={stream})", xbmc.LOGDEBUG)
         last_error = None
         for attempt in range(1, 4):
             try:
                 resp = self.session.get(self.url, headers=h, allow_redirects=True, stream=stream, timeout=timeout)
-                xbmc.log(f"[AHProxy] Response status: {resp.status_code}, Content-Type: {resp.headers.get('Content-Type')}", xbmc.LOGINFO)
+                xbmc.log(f"[AHProxy] Response status: {resp.status_code}, Content-Type: {resp.headers.get('Content-Type')}", xbmc.LOGDEBUG)
                 if not self.skip_resolve and resp.url != self.url:
                     self.resolved_url = resp.url
-                    xbmc.log(f"[AHProxy] Dynamically resolved redirected URL via GET: {self.resolved_url}", xbmc.LOGINFO)
+                    xbmc.log(f"[AHProxy] Dynamically resolved redirected URL via GET: {self.resolved_url}", xbmc.LOGDEBUG)
                 return resp
             except Exception as e:
                 last_error = e
@@ -823,7 +822,7 @@ class _ProxyHandler(BaseHTTPRequestHandler):
 
         if rng:
             extra["Range"] = rng
-            xbmc.log(f"[AHProxy] Kodi requested Range: {rng}", xbmc.LOGINFO)
+            xbmc.log(f"[AHProxy] Kodi requested Range: {rng}", xbmc.LOGDEBUG)
 
         rsp = None
         first_chunk = b""
@@ -1041,7 +1040,7 @@ class _ProxyHandler(BaseHTTPRequestHandler):
                                 xbmc.log(
                                     f"[AHProxy] First chunk sent: {bytes_sent} bytes "
                                     f"(Range={rng}, chunked={use_chunked})",
-                                    xbmc.LOGINFO,
+                                    xbmc.LOGDEBUG,
                                 )
                         except (
                             BrokenPipeError,
@@ -1065,7 +1064,7 @@ class _ProxyHandler(BaseHTTPRequestHandler):
                             )
                             self.close_connection = True
                         else:
-                            xbmc.log(f"[AHProxy] Stream complete: {bytes_sent} bytes", xbmc.LOGINFO)
+                            xbmc.log(f"[AHProxy] Stream complete: {bytes_sent} bytes", xbmc.LOGDEBUG)
                 except Exception as e:
                     xbmc.log(f"[AHProxy] Stream iteration error after {bytes_sent} bytes: {e}", xbmc.LOGERROR)
             else:

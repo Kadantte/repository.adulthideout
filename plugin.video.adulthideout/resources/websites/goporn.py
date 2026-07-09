@@ -315,8 +315,7 @@ class GoPorn(BaseWebsite):
             return None
 
         video_url = None
-        video_id = None
-        
+
         flashvars = {}
         flashvars_match = re.search(r'var flashvars = ({.*?});', html, re.DOTALL)
         if flashvars_match:
@@ -329,7 +328,6 @@ class GoPorn(BaseWebsite):
                     flashvars[m_kv.group(2)] = m_kv.group(3)
             
             video_url = flashvars.get('video_url')
-            video_id = flashvars.get('video_id')
 
         if not video_url:
              mp4_match = re.search(r"video_url:\s*'([^']+\.mp4[^']*)'", html)

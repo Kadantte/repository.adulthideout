@@ -357,7 +357,7 @@ class PornhubWebsite(BaseWebsite):
                 next_page_url_part = content.split('<li class="page_next">')[1].split('href="')[1].split('"')[0]
                 next_page_url = urllib.parse.urljoin(self.base_url, html.unescape(next_page_url_part))
                 self.add_dir('[COLOR blue]Next Page >>>>[/COLOR]', next_page_url, 2, self.icons['default'])
-        except Exception as e:
+        except Exception:
             if hasattr(self, 'notify_error'): self.notify_error("An error occurred while parsing the page.")
 
     def play_video(self, url):

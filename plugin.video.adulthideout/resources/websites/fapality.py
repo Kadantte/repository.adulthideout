@@ -41,7 +41,10 @@ class Fapality(BaseWebsite):
         re.IGNORECASE,
     )
     RE_NEXT = re.compile(r'href="([^"]+)"[^>]*>\s*(?:Next|›|»)', re.IGNORECASE)
-    RE_CAT = re.compile(r'href="(/categories/[^"]+|/pornstars/[^"]+|/channels/[^"]+)"[^>]*>([^<]+)</a>', re.IGNORECASE)
+    RE_CAT = re.compile(
+        r'href="((?:https?://(?:www\.)?fapality\.com)?/(?:categories|pornstars|channels)/[^"]*)"[^>]*>(.*?)</a>',
+        re.IGNORECASE | re.DOTALL,
+    )
     RE_STREAM = re.compile(
         r'(?:source|file|video_url|src)\s*[:=]\s*["\'](?P<url>https?://[^"\']+?\.mp4[^"\']*)["\']',
         re.IGNORECASE,
@@ -126,6 +129,17 @@ class Fapality(BaseWebsite):
         if not url or url == "BOOTSTRAP":
             url = self.BASE_URL
 
+        parsed = urllib.parse.urlparse(url)
+        directory_path = parsed.path.rstrip("/")
+        directory_modes = {
+            "/categories": self.process_categories,
+            "/pornstars": self.process_pornstars,
+            "/channels": self.process_channels,
+        }
+        if directory_path in directory_modes:
+            directory_modes[directory_path](url)
+            return
+
         self._add_standard_nav()
 
         html = self._fetch(url, referer=self.BASE_URL)
@@ -155,8 +169,12 @@ class Fapality(BaseWebsite):
 
         seen = set()
         for cat_url, cat_title in self.RE_CAT.findall(html):
-            title = re.sub(r"\s+", " ", cat_title).strip()
+            title = re.sub(r"<[^>]+>", " ", cat_title)
+            title = re.sub(r"\s+", " ", title).strip()
             if not title:
+                continue
+            parsed_url = urllib.parse.urlparse(urllib.parse.urljoin(self.BASE_URL, cat_url))
+            if parsed_url.path.rstrip("/") in ("/categories", "/pornstars", "/channels"):
                 continue
             key = title.lower()
             if key in seen:

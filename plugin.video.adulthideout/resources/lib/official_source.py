@@ -1,9 +1,10 @@
-﻿#!/usr/bin/env python
+#!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
 import hashlib
 import json
 import os
+import time
 import xml.etree.ElementTree as ET
 import urllib.request
 
@@ -31,6 +32,8 @@ EXPECTED_REPO_URLS = {
 }
 
 _REMOTE_TIMEOUT = 4
+_REMOTE_CACHE_TTL = 6 * 60 * 60
+_REMOTE_CACHE = None
 _ADDON = xbmcaddon.Addon()
 _FALLBACK_STRINGS = {
     30600: "The official repository add-on '{}' is not installed.",
@@ -109,7 +112,48 @@ def _read_bytes(path):
             return b""
 
 
+def _remote_cache_path():
+    profile = _translate(_ADDON.getAddonInfo("profile"))
+    return os.path.join(profile, "official_source_cache.json")
+
+
+def _load_remote_cache():
+    global _REMOTE_CACHE
+    if isinstance(_REMOTE_CACHE, dict):
+        return _REMOTE_CACHE
+    try:
+        with open(_remote_cache_path(), "r", encoding="utf-8") as handle:
+            cache = json.load(handle)
+    except Exception:
+        cache = {}
+    _REMOTE_CACHE = cache if isinstance(cache, dict) else {}
+    return _REMOTE_CACHE
+
+
+def _save_remote_cache(cache):
+    path = _remote_cache_path()
+    temp_path = path + ".tmp"
+    try:
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        with open(temp_path, "w", encoding="utf-8") as handle:
+            json.dump(cache, handle, separators=(",", ":"))
+        os.replace(temp_path, path)
+    except Exception as exc:
+        _log("Could not save metadata cache: {}".format(exc), xbmc.LOGDEBUG)
+        try:
+            os.remove(temp_path)
+        except Exception:
+            pass
+
+
 def _fetch_text(url, timeout=_REMOTE_TIMEOUT):
+    cache = _load_remote_cache()
+    cached = cache.get(url) if isinstance(cache.get(url), dict) else {}
+    cached_text = cached.get("text", "")
+    cached_at = cached.get("timestamp", 0)
+    if cached_text and time.time() - float(cached_at or 0) < _REMOTE_CACHE_TTL:
+        return cached_text
+
     req = urllib.request.Request(
         url,
         headers={
@@ -117,8 +161,18 @@ def _fetch_text(url, timeout=_REMOTE_TIMEOUT):
             "Accept": "text/plain,application/xml,application/json,*/*",
         },
     )
-    with urllib.request.urlopen(req, timeout=timeout) as response:
-        return response.read().decode("utf-8", errors="replace")
+    try:
+        with urllib.request.urlopen(req, timeout=timeout) as response:
+            text = response.read().decode("utf-8", errors="replace")
+    except Exception:
+        if cached_text:
+            _log("Using stale cached metadata for {}".format(url), xbmc.LOGWARNING)
+            return cached_text
+        raise
+
+    cache[url] = {"timestamp": time.time(), "text": text}
+    _save_remote_cache(cache)
+    return text
 
 
 def _parse_xml(text):
@@ -230,6 +284,15 @@ def _load_hash_manifest(addon_path, prefer_remote=True):
     return manifest if isinstance(manifest, dict) else None
 
 
+def _is_unreleased_build(addon_path):
+    changelog_path = os.path.join(addon_path, "changelog.txt")
+    try:
+        first_line = _read_text(changelog_path).splitlines()[0]
+    except (IndexError, TypeError):
+        return False
+    return "unreleased" in first_line.lower()
+
+
 def _check_hashes(addon_path, prefer_remote=True):
     manifest = _load_hash_manifest(addon_path, prefer_remote=prefer_remote)
     if not manifest:
@@ -293,7 +356,11 @@ def verify_and_warn(addon, show_dialog=True):
     metadata_issues = []
     if show_dialog:
         metadata_issues = _check_official_metadata(addon_id, addon_version)
-    hash_issues = _check_hashes(addon_path, prefer_remote=show_dialog)
+    prefer_remote_hashes = show_dialog and not _is_unreleased_build(addon_path)
+    hash_issues = _check_hashes(
+        addon_path,
+        prefer_remote=prefer_remote_hashes,
+    )
 
     remote_metadata_issues = [
         issue for issue in metadata_issues if _is_remote_metadata_issue(issue)

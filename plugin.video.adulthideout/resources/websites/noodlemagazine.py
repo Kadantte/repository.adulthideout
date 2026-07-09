@@ -9,7 +9,6 @@ import os
 import threading
 import json
 import http.cookiejar
-import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
 import xbmc
@@ -75,7 +74,7 @@ class NoodleMagazine(BaseWebsite):
         self.cookie_file = os.path.join(profile, 'nm_cookies.jar')
 
     def get_session(self):
-        global _SESSION, _LOCK
+        global _SESSION
         with _LOCK:
             if self.session:
                 return self.session

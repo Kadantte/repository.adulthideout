@@ -1,6 +1,5 @@
 
 import re
-import sys
 import json
 import html
 import base64
@@ -8,15 +7,8 @@ import urllib.parse
 import xbmc
 import xbmcgui
 import xbmcplugin
-import xbmcaddon
-import xbmcvfs
-import hashlib
-import os
-import sys
 import threading
-import http.cookiejar
 import socket
-import socketserver
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from resources.lib.base_website import BaseWebsite
 
@@ -84,7 +76,7 @@ class ThumbProxyServer(ThreadingHTTPServer):
         super().__init__(server_address, RequestHandlerClass)
 
 def start_thumb_proxy(scraper):
-    global _PROXY_INSTANCE, _PROXY_LOCK
+    global _PROXY_INSTANCE
     with _PROXY_LOCK:
         if _PROXY_INSTANCE:
             return _PROXY_INSTANCE
@@ -165,19 +157,9 @@ class Tube8(BaseWebsite):
         super(Tube8, self).add_link(name, url, mode, icon, fanart, context_menu, info_labels)
 
     def _set_age_cookie(self):
-        try:
-            from http.cookiejar import Cookie
-            age_cookie = Cookie(
-                version=0, name='access', value='1', port=None, port_specified=False,
-                domain='.tube8.com', domain_specified=True, domain_initial_dot=True,
-                path='/', path_specified=True, secure=False, expires=None, discard=True,
-                comment=None, comment_url=None, rest={}
-            )
-            # We don't have a persistent session/opener in BaseWebsite usually, 
-            # but cloudscraper/requests handles cookies. 
-            # If used with cloudscraper, we might need a session.
-            pass
-        except: pass
+        # Cookie is sent statically via get_headers()'s "Cookie: access=1" instead;
+        # cloudscraper/requests sessions here don't retain a cookie object we could set.
+        pass
 
     def get_headers(self, referer=None):
         return {
@@ -425,7 +407,6 @@ class Tube8(BaseWebsite):
             # We can't easily get the *source* list item here without passing it, 
             # but we can try to re-extract it or use a generic one.
             # Ideally, we should set the Art to the proxied thumb to avoid Kodi trying to fetch the original
-            pass
 
             xbmcplugin.setResolvedUrl(self.addon_handle, True, li)
         else:

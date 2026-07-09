@@ -137,7 +137,6 @@ class Hanime(BaseWebsite):
         return url, label
 
     def _get_html(self, url, referer=None):
-        global _SCRAPER
         headers = {
             "User-Agent": (
                 "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
@@ -551,7 +550,6 @@ class Hanime(BaseWebsite):
         return False
 
     def _probe_cloudscraper(self, stream_url, headers):
-        global _SCRAPER
         if not _HAS_CF or not _SCRAPER:
             return False
 
@@ -650,7 +648,6 @@ class Hanime(BaseWebsite):
             return False
 
     def _play_via_cloudscraper_proxy(self, stream_url, proxy_headers):
-        global _SCRAPER
         if not _HAS_CF or not _SCRAPER:
             return False
 
