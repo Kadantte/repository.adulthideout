@@ -243,10 +243,58 @@ class GlobalSearch:
     def _filter_results(self, results):
         if not isinstance(results, list):
             return []
-        return [
-            result for result in results
-            if isinstance(result, dict) and result.get("source") not in UNSTABLE_PLAYLIST_SOURCES
-        ]
+        filtered = []
+        seen_urls = set()
+        for result in results:
+            if not isinstance(result, dict) or result.get("source") in UNSTABLE_PLAYLIST_SOURCES:
+                continue
+            target_url = str(result.get("url") or "").strip()
+            if target_url and target_url in seen_urls:
+                continue
+            if target_url:
+                seen_urls.add(target_url)
+            filtered.append(result)
+        return filtered
+
+    def _result_options_key(self, query, search_mode="selected"):
+        return "{}::{}".format(search_mode, query.strip().lower())
+
+    def _result_options(self, query, search_mode="selected"):
+        options = self._load_state().get("result_options")
+        if not isinstance(options, dict):
+            return {}
+        value = options.get(self._result_options_key(query, search_mode))
+        return dict(value) if isinstance(value, dict) else {}
+
+    def _save_result_options(self, query, search_mode, options):
+        state = self._load_state()
+        all_options = state.get("result_options")
+        if not isinstance(all_options, dict):
+            all_options = {}
+        key = self._result_options_key(query, search_mode)
+        if options:
+            all_options[key] = options
+        else:
+            all_options.pop(key, None)
+        state["result_options"] = all_options
+        self._save_state(state)
+
+    def _display_results(self, query, results, search_mode="selected"):
+        displayed = list(results or [])
+        options = self._result_options(query, search_mode)
+        sources = options.get("sources")
+        if isinstance(sources, list) and sources:
+            allowed = set(sources)
+            displayed = [result for result in displayed if result.get("source") in allowed]
+        text_filter = str(options.get("text") or "").strip().lower()
+        if text_filter:
+            displayed = [result for result in displayed if text_filter in str(result.get("label") or "").lower()]
+        sort_order = options.get("sort", "relevance")
+        if sort_order == "title":
+            displayed.sort(key=lambda result: str(result.get("label") or "").lower())
+        elif sort_order == "source":
+            displayed.sort(key=lambda result: (self._source_label(result.get("source", "")).lower(), str(result.get("label") or "").lower()))
+        return displayed
 
     def _cached_results(self, query, search_mode="selected"):
         cache = self._load_state().get("result_cache")
@@ -399,6 +447,7 @@ class GlobalSearch:
         state = self._load_state()
         state["history"] = []
         state["result_cache"] = {}
+        state["result_options"] = {}
         self._save_state(state)
         return self.show_menu()
 
@@ -760,6 +809,22 @@ class GlobalSearch:
         is_folder = bool(result.get("is_folder"))
         if not is_folder:
             item.setProperty("IsPlayable", "true")
+            try:
+                from resources.lib.personal_library import build_save_command
+                item.addContextMenuItems([(
+                    self.addon.getLocalizedString(30706) or "Save to Vault",
+                    build_save_command(
+                        sys_argv0(),
+                        result.get("url", ""),
+                        result.get("label") or "Video",
+                        source,
+                        art.get("thumb", ""),
+                        art.get("fanart", ""),
+                        "video",
+                    ),
+                )])
+            except Exception as exc:
+                self.logger("Vault context failed: {}".format(exc), xbmc.LOGWARNING)
         xbmcplugin.addDirectoryItem(self.addon_handle, result.get("url", ""), item, is_folder)
 
     def _add_refresh_item(self, query, page=1, search_mode="selected"):
@@ -791,6 +856,11 @@ class GlobalSearch:
         end = start + RESULTS_PER_PAGE
 
         self._add_refresh_item(query, page, search_mode=search_mode)
+        self._add_dir("{} [COLOR grey]{}[/COLOR]".format(
+            self.addon.getLocalizedString(30759) or "Filter & Sort Results", total
+        ), "configure_results", self.search_icon, query=query, search_mode=search_mode)
+        self._add_dir(self.addon.getLocalizedString(30732) or "Select multiple videos for Vault", "select_page_to_vault", self.search_icon,
+                      query=query, page=page, search_mode=search_mode)
         if page > 1:
             self._add_page_item(query, page - 1, "[COLOR cyan]Previous Page[/COLOR] ({}/{})".format(page - 1, pages), search_mode=search_mode)
         for result in results[start:end]:
@@ -799,11 +869,112 @@ class GlobalSearch:
             self._add_page_item(query, page + 1, "[COLOR cyan]Next Page[/COLOR] ({}/{})".format(page + 1, pages), search_mode=search_mode)
         end_directory_with_view(self.addon_handle, self.addon)
 
+    def select_page_to_vault(self, query, page=1, search_mode="selected"):
+        cached = self._cached_results(query, search_mode=search_mode) or []
+        results = self._display_results(query, cached, search_mode=search_mode)
+        try:
+            page = max(1, int(page))
+        except (TypeError, ValueError):
+            page = 1
+        start = (page - 1) * RESULTS_PER_PAGE
+        selected = results[start:start + RESULTS_PER_PAGE]
+        if not selected:
+            return self._render_results_page(query, results, page, search_mode=search_mode)
+        dialog = xbmcgui.Dialog()
+        if not hasattr(dialog, "multiselect"):
+            dialog.notification("Global Search", "Multiple selection is not supported by this Kodi version.", xbmcgui.NOTIFICATION_WARNING, 3000)
+            return self._render_results_page(query, results, page, search_mode=search_mode)
+        labels = []
+        for result in selected:
+            source = self._source_label(result.get("source", ""))
+            labels.append("[{}] {}".format(source, result.get("label") or "Video"))
+        indexes = dialog.multiselect(self.addon.getLocalizedString(30732) or "Select multiple videos for Vault", labels)
+        if not indexes:
+            return self._render_results_page(query, results, page, search_mode=search_mode)
+        from resources.lib.personal_library import PersonalLibrary
+        items = []
+        for index in indexes:
+            if not isinstance(index, int) or index < 0 or index >= len(selected):
+                continue
+            result = selected[index]
+            art = result.get("art") if isinstance(result.get("art"), dict) else {}
+            items.append({
+                "target_url": result.get("url", ""),
+                "title": result.get("label", "Video"),
+                "source": result.get("source", ""),
+                "thumbnail": art.get("thumb", ""),
+                "fanart": art.get("fanart", ""),
+                "kind": "video",
+            })
+        PersonalLibrary(self.addon_handle, sys_argv0()).save_items(items)
+        return self._render_results_page(query, results, page, search_mode=search_mode)
+
+    def configure_results(self, query, search_mode="selected"):
+        cached = self._cached_results(query, search_mode=search_mode) or []
+        if not cached:
+            return self.show_menu()
+        options = self._result_options(query, search_mode)
+        choices = [
+            self.addon.getLocalizedString(30760) or "Filter Sources",
+            self.addon.getLocalizedString(30761) or "Filter by Text",
+            self.addon.getLocalizedString(30762) or "Sort Order",
+            self.addon.getLocalizedString(30763) or "Reset Filters",
+        ]
+        action = xbmcgui.Dialog().select(self.addon.getLocalizedString(30759) or "Filter & Sort Results", choices)
+        if action == 0:
+            sources = sorted({result.get("source") for result in cached if result.get("source")}, key=self._source_label)
+            selected = options.get("sources") if isinstance(options.get("sources"), list) else sources
+            preselect = [index for index, source in enumerate(sources) if source in selected]
+            dialog = xbmcgui.Dialog()
+            if hasattr(dialog, "multiselect"):
+                indexes = dialog.multiselect(
+                    self.addon.getLocalizedString(30760) or "Filter Sources",
+                    [self._source_label(source) for source in sources],
+                    preselect=preselect,
+                )
+                if indexes is not None:
+                    chosen = [sources[index] for index in indexes if isinstance(index, int) and 0 <= index < len(sources)]
+                    if not chosen:
+                        dialog.notification("Global Search", self.addon.getLocalizedString(30767) or "Select at least one source.", xbmcgui.NOTIFICATION_WARNING, 2500)
+                    elif len(chosen) == len(sources):
+                        options.pop("sources", None)
+                    else:
+                        options["sources"] = chosen
+        elif action == 1:
+            keyboard = xbmc.Keyboard(options.get("text", ""), self.addon.getLocalizedString(30768) or "Filter Results")
+            keyboard.doModal()
+            if keyboard.isConfirmed():
+                value = keyboard.getText().strip()
+                if value:
+                    options["text"] = value
+                else:
+                    options.pop("text", None)
+        elif action == 2:
+            labels = [
+                self.addon.getLocalizedString(30764) or "Relevance",
+                self.addon.getLocalizedString(30765) or "Title A-Z",
+                self.addon.getLocalizedString(30766) or "Source",
+            ]
+            values = ("relevance", "title", "source")
+            current = values.index(options.get("sort", "relevance")) if options.get("sort", "relevance") in values else 0
+            selected = xbmcgui.Dialog().select(self.addon.getLocalizedString(30762) or "Sort Order", labels, preselect=current)
+            if selected >= 0:
+                if selected == 0:
+                    options.pop("sort", None)
+                else:
+                    options["sort"] = values[selected]
+        elif action == 3:
+            options = {}
+        else:
+            return self._open_results(query, refresh=False, search_mode=search_mode)
+        self._save_result_options(query, search_mode, options)
+        return self._open_results(query, refresh=False, search_mode=search_mode)
+
     def show_cached_results(self, query, page=1, search_mode="selected"):
         results = self._cached_results(query, search_mode=search_mode)
         if results is None:
             return False
-        self._render_results_page(query, results, page, search_mode=search_mode)
+        self._render_results_page(query, self._display_results(query, results, search_mode=search_mode), page, search_mode=search_mode)
         return True
 
     def run(self, query, refresh=False, page=1, search_mode="selected"):
@@ -865,7 +1036,7 @@ class GlobalSearch:
             self.logger("Skipped/failed sources: {}".format(", ".join(failed)), xbmc.LOGWARNING)
         self._save_results(query, cache_results, search_mode=search_mode, sources=sources)
         self.logger("Global search '{}' ({}) returned {} results in {:.1f}s".format(query, search_mode, added, time.time() - started))
-        self._render_results_page(query, cache_results, page, search_mode=search_mode)
+        self._render_results_page(query, self._display_results(query, cache_results, search_mode=search_mode), page, search_mode=search_mode)
 
 
 def sys_argv0():

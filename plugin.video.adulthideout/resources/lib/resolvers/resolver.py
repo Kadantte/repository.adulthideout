@@ -24,9 +24,16 @@ from resources.lib.resolvers import voesx_resolver
 from resources.lib.resolvers import vtube_resolver
 from resources.lib.resolvers import tubexplayer_resolver
 from resources.lib.resolvers import watchstreamhd_resolver
+from resources.lib.resolvers import vsonic_resolver
 
 
 RESOLVERS = [
+    {
+        "key": "vsonic",
+        "setting": "resolver_enable_vsonic",
+        "module": vsonic_resolver,
+        "hosts": ("vsonic.click", "vsonic"),
+    },
     {
         "key": "hglink",
         "setting": "resolver_enable_hglink",
@@ -120,7 +127,7 @@ RESOLVERS = [
     },
     {
         "key": "bigwarp",
-        "setting": None,
+        "setting": "resolver_enable_bigwarp",
         "module": bigwarp_resolver,
         "hosts": ("bigwarp", "bgwp"),
     },
@@ -155,6 +162,8 @@ PREFERRED_KEYS = [
     "88z",
     "tubexplayer",
     "watchstreamhd",
+    "bigwarp",
+    "vsonic",
 ]
 
 
@@ -321,6 +330,28 @@ def probe_resolved_stream(url, headers=None, timeout=7):
             xbmc.LOGWARNING,
         )
     return False
+
+
+def resolve_first_working(urls, referer="", headers=None, addon=None):
+    """Resolve preferred enabled mirrors until one passes the optional probe."""
+    addon = addon or _addon()
+    for candidate in sort_urls_by_resolver_preference(urls or [], addon):
+        if not is_resolver_enabled(candidate, addon):
+            continue
+        try:
+            result = resolve(candidate, referer=referer, headers=headers)
+            if isinstance(result, tuple):
+                stream_url, stream_headers = result
+            else:
+                stream_url, stream_headers = result, {}
+            if not stream_url or not str(stream_url).startswith("http"):
+                continue
+            if resolver_preflight_enabled(addon) and not probe_resolved_stream(stream_url, stream_headers):
+                continue
+            return stream_url, stream_headers or {}, candidate
+        except Exception as exc:
+            xbmc.log("[AdultHideout][resolver] Mirror failed for {}: {}".format(candidate, exc), xbmc.LOGWARNING)
+    return "", {}, ""
 
 
 def resolve(url, referer="", headers=None):

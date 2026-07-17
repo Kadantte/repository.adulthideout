@@ -12,6 +12,7 @@ import xbmcgui
 import xbmcplugin
 
 from resources.lib.base_website import BaseWebsite
+from resources.lib.playback_preferences import order_quality_variants
 
 
 class HQPornero(BaseWebsite):
@@ -73,6 +74,23 @@ class HQPornero(BaseWebsite):
     def _slug(self, query):
         return re.sub(r"[^a-z0-9]+", "-", (query or "").lower()).strip("-")
 
+    def _thumbnail_url(self, value):
+        thumb = self._absolute(value)
+        if not thumb:
+            return self.icon
+        try:
+            from resources.lib.thumb_proxy import build_thumb_url
+            proxied = build_thumb_url(thumb, referer=self.base_url)
+            if proxied != thumb:
+                return proxied
+            return "{}|User-Agent={}&Referer={}".format(
+                thumb,
+                urllib.parse.quote(self.ua),
+                urllib.parse.quote(self.base_url),
+            )
+        except Exception:
+            return thumb
+
     def get_start_url_and_label(self):
         return self.base_url, self.label
 
@@ -119,7 +137,7 @@ class HQPornero(BaseWebsite):
             for attr in ("data-src", "src"):
                 thumb_match = re.search(r'\s{}=["\']([^"\']+)["\']'.format(attr), img_tag, re.IGNORECASE)
                 if thumb_match:
-                    thumb = self._absolute(thumb_match.group(1))
+                    thumb = self._thumbnail_url(thumb_match.group(1))
                     break
             if "lazy-load" in thumb:
                 thumb = self.icon
@@ -166,8 +184,7 @@ class HQPornero(BaseWebsite):
         for href, quality in re.findall(r'<a\b[^>]+href=["\']([^"\']+\.mp4[^"\']*)["\'][^>]*>([^<]+)</a>', html_content or "", re.IGNORECASE):
             q_match = re.search(r"(\d+)", quality)
             streams.append((int(q_match.group(1)) if q_match else 0, self._absolute(href, base_url)))
-        streams.sort(key=lambda item: item[0], reverse=True)
-        return [url for _, url in streams]
+        return [url for _, url in order_quality_variants(streams, self.addon)]
 
     def resolve_recording_stream(self, url):
         detail_html = self._get(url, referer=self.base_url)

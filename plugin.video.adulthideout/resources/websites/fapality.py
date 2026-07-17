@@ -11,6 +11,7 @@ import xbmcaddon
 
 from resources.lib.base_website import BaseWebsite
 from resources.lib.proxy_utils import ProxyController, PlaybackGuard
+from resources.lib.playback_preferences import select_quality_variant
 
 try:
     addon_path = xbmcaddon.Addon().getAddonInfo('path')
@@ -218,7 +219,7 @@ class Fapality(BaseWebsite):
             m = re.search(r'(\d{3,4})p', u, re.IGNORECASE)
             return int(m.group(1)) if m else 0
 
-        best = sorted(sources, key=quality_score, reverse=True)[0]
+        best = select_quality_variant([(quality_score(source), source) for source in sources], self.addon)
         headers = self._headers(referer=url)
 
         try:

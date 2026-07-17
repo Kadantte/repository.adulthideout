@@ -22,12 +22,31 @@ VIDEO_EXTENSIONS = ("mp4", "mkv", "webm", "mov", "ts")
 VFS_PREFIXES = ("smb://", "nfs://")
 JOB_STATES = ("queued", "running", "transferring", "submitted", "complete", "failed", "cancelled")
 ADDON_ID = "plugin.video.adulthideout"
+STATUS_LABEL_IDS = {
+    "queued": (30738, "Queued"),
+    "running": (30739, "Running"),
+    "transferring": (30740, "Transferring"),
+    "submitted": (30741, "Submitted"),
+    "complete": (30742, "Complete"),
+    "failed": (30743, "Failed"),
+    "cancelled": (30744, "Cancelled"),
+}
 
 
 def _addon():
     # The background worker is launched through RunScript, where Kodi cannot
     # infer an add-on id. Always bind settings and profile paths explicitly.
     return xbmcaddon.Addon(ADDON_ID)
+
+
+def _lang(message_id, fallback, *args):
+    value = _addon().getLocalizedString(message_id) or fallback
+    return value.format(*args) if args else value
+
+
+def _status_label(status):
+    message_id, fallback = STATUS_LABEL_IDS.get(status, (30746, "Status"))
+    return _lang(message_id, fallback)
 
 
 def _profile_path(*parts):
@@ -107,6 +126,15 @@ def list_jobs():
         if job:
             jobs.append(job)
     return sorted(jobs, key=lambda item: item.get("created", 0), reverse=True)
+
+
+def has_downloads():
+    """Return whether the user has active jobs or retained download history."""
+    return bool(list_jobs())
+
+
+def has_active_downloads():
+    return any(job.get("status") in ("queued", "running", "transferring", "submitted") for job in list_jobs())
 
 
 def add_download_context(website, context_menu, page_url, title, thumbnail=""):
@@ -284,7 +312,7 @@ def enqueue_download(website, page_url, title="", thumbnail=""):
         return False
     resolver = getattr(website, "resolve_recording_stream", None)
     if not resolver:
-        _notify(_addon().getLocalizedString(30637) or "Could not resolve a downloadable stream.", error=True)
+        _notify(_lang(30753, "Could not resolve a downloadable stream."), error=True)
         return False
     try:
         stream_url, headers, explicit_extension = normalize_resolved(resolver(page_url))
@@ -294,7 +322,7 @@ def enqueue_download(website, page_url, title="", thumbnail=""):
         headers = {}
         explicit_extension = ""
     if not stream_url:
-        _notify(_addon().getLocalizedString(30637) or "Could not resolve a downloadable stream.", error=True)
+        _notify(_lang(30753, "Could not resolve a downloadable stream."), error=True)
         return False
 
     backend = _backend_for(stream_url)
@@ -378,8 +406,9 @@ def _submit_aria2(job):
 
 def _submit_jdownloader(job):
     if job.get("headers"):
-        update_job(job["id"], status="failed", error="JDownloader Click'n'Load cannot preserve required stream headers")
-        _notify(_addon().getLocalizedString(30664) or "This stream needs headers that JDownloader cannot receive through Click'n'Load.", error=True)
+        error = _addon().getLocalizedString(30664) or "This stream needs headers that JDownloader cannot receive through Click'n'Load."
+        update_job(job["id"], status="failed", error=error)
+        _notify(error, error=True)
         return False
     endpoint = _setting("jdownloader_url", "http://127.0.0.1:9666").rstrip("/") + "/flash/add"
     data = urllib.parse.urlencode({"urls": job["stream_url"], "package": "AdultHideout", "source": job.get("page_url", "")}).encode("utf-8")
@@ -437,7 +466,7 @@ def cancel_job(job_id):
             _json_rpc(endpoint, "aria2.remove", _aria2_params([job["external_id"]]))
         except Exception:
             pass
-    update_job(job_id, status="cancelled", error="Cancelled by user")
+    update_job(job_id, status="cancelled", error=_lang(30751, "Cancelled by user"))
 
 
 def retry_job(job_id):
@@ -491,6 +520,17 @@ def _format_size(value):
     return "0 B"
 
 
+def _format_duration(seconds):
+    seconds = max(0, int(seconds or 0))
+    minutes, seconds = divmod(seconds, 60)
+    hours, minutes = divmod(minutes, 60)
+    if hours:
+        return "{}h {:02d}m".format(hours, minutes)
+    if minutes:
+        return "{}m {:02d}s".format(minutes, seconds)
+    return "{}s".format(seconds)
+
+
 def show_manager(handle, base_url):
     addon = _addon()
     refresh_url = "{}?mode=31&action=refresh".format(base_url)
@@ -499,17 +539,23 @@ def show_manager(handle, base_url):
     for raw_job in list_jobs():
         job = refresh_external_job(raw_job)
         status = job.get("status", "queued")
+        status_label = _status_label(status)
         progress = int(job.get("progress") or 0)
-        label = "[{}] {}".format(status.upper(), job.get("title") or "Download")
+        title = job.get("title") or _lang(30747, "Download")
+        label = "[{}] {}".format(status_label.upper(), title)
         if status in ("running", "transferring") and job.get("total"):
-            label = "[{} {}%] {}".format(status.upper(), progress, job.get("title") or "Download")
+            label = "[{} {}%] {}".format(status_label.upper(), progress, title)
         item = xbmcgui.ListItem(label=label)
         item.setArt({"thumb": job.get("thumbnail") or "", "icon": job.get("thumbnail") or ""})
         details = "{} / {}".format(_format_size(job.get("downloaded")), _format_size(job.get("total"))) if job.get("total") else _format_size(job.get("downloaded"))
-        plot = "Backend: {}\nStatus: {}\n{}".format(job.get("backend"), status, details)
+        plot = "{}: {}\n{}: {}\n{}".format(
+            _lang(30745, "Backend"), job.get("backend"),
+            _lang(30746, "Status"), status_label,
+            details,
+        )
         if job.get("error"):
             plot += "\n" + job["error"]
-        item.setInfo("video", {"title": job.get("title") or "Download", "plot": plot})
+        item.setInfo("video", {"title": title, "plot": plot})
         menu = []
         if status not in ("complete", "failed", "cancelled"):
             menu.append((addon.getLocalizedString(30655) or "Cancel download", "RunPlugin({}?mode=31&action=cancel&job_id={})".format(base_url, job["id"])))
@@ -560,7 +606,7 @@ def mark_cancelled(job_id, run_token):
     job = load_job(job_id)
     if not job or job.get("run_token") != run_token or not is_cancel_requested(job_id):
         return
-    job.update({"status": "cancelled", "error": "Cancelled by user"})
+    job.update({"status": "cancelled", "error": _lang(30751, "Cancelled by user")})
     save_job(job)
 
 

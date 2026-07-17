@@ -16,6 +16,54 @@ if ADDON_ROOT not in sys.path:
 from resources.lib import download_manager
 
 
+class _BackgroundProgress:
+    def __init__(self, job):
+        self.dialog = None
+        self.expires_at = None
+        try:
+            setting = download_manager._setting("download_progress_display", "0")
+            durations = {"0": 10, "1": 60, "2": None}
+            duration = durations.get(str(setting), 10)
+            if duration:
+                self.expires_at = time.time() + duration
+            dialog_class = getattr(__import__("xbmcgui"), "DialogProgressBG", None)
+            if dialog_class:
+                self.dialog = dialog_class()
+                self.dialog.create("AdultHideout", job.get("title") or download_manager._lang(30747, "Download"))
+        except Exception as exc:
+            xbmc.log("[AdultHideout][downloads] progress dialog unavailable: {}".format(exc), xbmc.LOGDEBUG)
+
+    def update(self, job, percent=None):
+        if not self.dialog:
+            return
+        if self.expires_at and time.time() >= self.expires_at:
+            self.close()
+            return
+        try:
+            if percent is None:
+                percent = int(job.get("progress") or 0)
+            downloaded = download_manager._format_size(job.get("downloaded"))
+            total = download_manager._format_size(job.get("total")) if job.get("total") else "?"
+            message = "{} / {}".format(downloaded, total)
+            speed = job.get("speed")
+            if speed:
+                message += "  |  {}".format(download_manager._format_size(speed) + "/s")
+            eta = job.get("eta")
+            if eta:
+                message += "  |  " + download_manager._lang(30752, "ETA {}", download_manager._format_duration(eta))
+            self.dialog.update(max(0, min(100, int(percent))), job.get("title") or download_manager._lang(30747, "Download"), message)
+        except Exception:
+            pass
+
+    def close(self):
+        if self.dialog:
+            try:
+                self.dialog.close()
+            except Exception:
+                pass
+            self.dialog = None
+
+
 def _cancelled(job_id, run_token):
     current = download_manager.load_job(job_id)
     return (
@@ -27,7 +75,7 @@ def _cancelled(job_id, run_token):
     )
 
 
-def _run_internal(job, run_token):
+def _run_internal(job, run_token, progress=None):
     try:
         import requests
     except ImportError:
@@ -46,6 +94,7 @@ def _run_internal(job, run_token):
     total = int(response.headers.get("Content-Length") or 0) + existing
     done = existing
     last_update = 0
+    started = time.time()
     with open(path, mode) as output:
         for chunk in response.iter_content(chunk_size=256 * 1024):
             if _cancelled(job["id"], run_token):
@@ -57,15 +106,23 @@ def _run_internal(job, run_token):
             done += len(chunk)
             now = time.time()
             if now - last_update >= 1:
-                progress = int(done * 100 / total) if total else 0
-                download_manager.update_job_for_run(job["id"], run_token, downloaded=done, total=total, progress=progress)
+                percent = int(done * 100 / total) if total else 0
+                elapsed = max(0.1, now - started)
+                speed = int(max(0, done - existing) / elapsed)
+                eta = int(max(0, total - done) / speed) if speed and total else 0
+                changes = {"downloaded": done, "total": total, "progress": percent, "speed": speed, "eta": eta}
+                current = download_manager.update_job_for_run(job["id"], run_token, **changes)
+                if current and progress:
+                    progress.update(current, percent)
                 last_update = now
     response.close()
-    download_manager.update_job_for_run(job["id"], run_token, downloaded=done, total=total, progress=100)
+    current = download_manager.update_job_for_run(job["id"], run_token, downloaded=done, total=total, progress=100, eta=0)
+    if current and progress:
+        progress.update(current, 100)
     return path
 
 
-def _run_ffmpeg(job, run_token):
+def _run_ffmpeg(job, run_token, progress=None):
     path = download_manager.staging_path(job)
     command = download_manager.build_ffmpeg_command(job, path)
     log_path = path + ".log"
@@ -90,7 +147,9 @@ def _run_ffmpeg(job, run_token):
                 return None
             now = time.time()
             if now - last_update >= 1 and os.path.exists(path):
-                download_manager.update_job_for_run(job["id"], run_token, downloaded=os.path.getsize(path))
+                current = download_manager.update_job_for_run(job["id"], run_token, downloaded=os.path.getsize(path))
+                if current and progress:
+                    progress.update(current)
                 last_update = now
             xbmc.sleep(500)
         if process.returncode != 0:
@@ -107,27 +166,33 @@ def run(job_id, run_token=""):
     if not job or job.get("status") == "cancelled" or job.get("run_token") != run_token:
         return
     download_manager.update_job_for_run(job_id, run_token, status="running", error="")
+    progress = _BackgroundProgress(job)
     try:
         if job.get("backend") == "ffmpeg":
-            staging = _run_ffmpeg(job, run_token)
+            staging = _run_ffmpeg(job, run_token, progress)
         else:
-            staging = _run_internal(job, run_token)
+            staging = _run_internal(job, run_token, progress)
         if not staging:
             if _cancelled(job_id, run_token):
                 download_manager.mark_cancelled(job_id, run_token)
             else:
-                download_manager.update_job_for_run(job_id, run_token, status="failed", error="Download produced no file")
+                download_manager.update_job_for_run(job_id, run_token, status="failed", error=download_manager._lang(30750, "Download produced no file"))
             return
         if _cancelled(job_id, run_token):
             return
         final_path = download_manager.finalize_file(job, staging, run_token=run_token)
         download_manager.update_job_for_run(job_id, run_token, status="complete", final_path=final_path, progress=100)
+        progress.close()
         xbmcgui = __import__("xbmcgui")
-        xbmcgui.Dialog().notification("AdultHideout", "Download complete: {}".format(job.get("title") or "Video"), xbmcgui.NOTIFICATION_INFO, 5000)
+        xbmcgui.Dialog().notification("AdultHideout", download_manager._lang(30748, "Download complete: {}", job.get("title") or "Video"), xbmcgui.NOTIFICATION_INFO, 5000)
     except Exception as exc:
         xbmc.log("[AdultHideout][downloads] worker failed: {}".format(exc), xbmc.LOGERROR)
         if not _cancelled(job_id, run_token):
             download_manager.update_job_for_run(job_id, run_token, status="failed", error=str(exc))
+            xbmcgui = __import__("xbmcgui")
+            xbmcgui.Dialog().notification("AdultHideout", download_manager._lang(30749, "Download failed: {}", str(exc)), xbmcgui.NOTIFICATION_ERROR, 5000)
+    finally:
+        progress.close()
 
 
 if __name__ == "__main__" and len(sys.argv) > 1:

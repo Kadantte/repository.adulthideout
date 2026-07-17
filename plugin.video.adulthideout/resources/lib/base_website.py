@@ -187,7 +187,16 @@ class BaseWebsite:
             liz.setInfo('video', info_labels)
         # --- ENDE ---
 
-        if context_menu: 
+        context_menu = list(context_menu or [])
+        try:
+            from resources.lib.personal_library import build_save_command
+            context_menu.append((
+                self.addon.getLocalizedString(30706) or 'Save to Vault',
+                build_save_command(sys.argv[0], u, name_param or name, self.name, icon, fanart, 'folder')
+            ))
+        except Exception as exc:
+            self.logger.warning("Vault directory context failed: %s", exc)
+        if context_menu:
             liz.addContextMenuItems(context_menu)
             
         xbmcplugin.addDirectoryItem(handle=self.addon_handle, url=u, listitem=liz, isFolder=True)
@@ -231,6 +240,16 @@ class BaseWebsite:
                 context_menu = add_download_context(self, context_menu, url, name, icon)
             except Exception as exc:
                 self.logger.warning("Download context failed: %s", exc)
+
+        if mode == 4:
+            try:
+                from resources.lib.personal_library import build_save_command
+                context_menu.append((
+                    self.addon.getLocalizedString(30706) or 'Save to Vault',
+                    build_save_command(sys.argv[0], u, name, self.name, icon, fanart, 'video')
+                ))
+            except Exception as exc:
+                self.logger.warning("Vault video context failed: %s", exc)
         
         if context_menu: 
             liz.addContextMenuItems(context_menu)

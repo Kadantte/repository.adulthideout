@@ -15,7 +15,6 @@ from resources.lib.base_website import BaseWebsite
 from resources.lib.decoders.kvs_decoder import kvs_decode_url
 from resources.lib.proxy_utils import PlaybackGuard, ProxyController
 
-
 class KVSTubeWebsite(BaseWebsite):
     label = ""
     video_path_markers = ("/video/", "/videos/")
@@ -41,12 +40,12 @@ class KVSTubeWebsite(BaseWebsite):
             addon_handle=addon_handle,
             addon=addon,
         )
-        self.session = requests.Session()
         self.ua = (
             "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
             "AppleWebKit/537.36 (KHTML, like Gecko) "
             "Chrome/125.0.0.0 Safari/537.36"
         )
+        self.session = requests.Session()
 
     def _headers(self, referer=None, accept="text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8"):
         return {
@@ -199,6 +198,9 @@ class KVSTubeWebsite(BaseWebsite):
                 re.IGNORECASE,
             )
             duration = self._clean(duration_match.group(1)) if duration_match else ""
+            if not self.convert_duration(duration):
+                badge_match = re.search(r'\b(\d{1,2}:\d{2}(?::\d{2})?)\b', block)
+                duration = badge_match.group(1) if badge_match else ""
             seconds = self.convert_duration(duration)
             label = "{} [COLOR lime]({})[/COLOR]".format(title, duration) if duration else title
             info = {"title": title, "plot": title}
@@ -275,6 +277,8 @@ class KVSTubeWebsite(BaseWebsite):
                     next_url = self.get_page_url(current_url, int(from_match.group(1)))
                 continue
             target = urllib.parse.urlparse(self._absolute(href))
+            if target.path.startswith(getattr(self, "skip_category_path_prefixes", ())):
+                continue
             if models_only:
                 if model_marker not in target.path or not re.search(r"<img\b", body, re.IGNORECASE):
                     continue
@@ -356,10 +360,14 @@ class KVSTubeWebsite(BaseWebsite):
             stream_url = self._normalize_stream(href, license_code)
             if self._is_stream_candidate(stream_url):
                 urls.setdefault("download", stream_url)
+        for source in re.findall(r'<source\b[^>]*\bsrc=["\']([^"\']+\.mp4/?[^"\']*)["\']', html_content or "", re.IGNORECASE):
+            stream_url = self._normalize_stream(source, license_code)
+            if self._is_stream_candidate(stream_url):
+                urls.setdefault("source", stream_url)
         if self.prefer_default_stream:
-            order = ["video_url", "video_alt_url", "video_alt_url2", "video_alt_url3", "video_alt_url4", "video_alt_url5", "download", "event_reporting2"]
+            order = ["video_url", "video_alt_url", "video_alt_url2", "video_alt_url3", "video_alt_url4", "video_alt_url5", "source", "download", "event_reporting2"]
         else:
-            order = ["video_alt_url5", "video_alt_url4", "video_alt_url3", "video_alt_url2", "video_alt_url", "video_url", "download", "event_reporting2"]
+            order = ["video_alt_url5", "video_alt_url4", "video_alt_url3", "video_alt_url2", "video_alt_url", "video_url", "source", "download", "event_reporting2"]
         for key in order:
             if key in urls and "get_file/" in urls[key]:
                 return urls[key]

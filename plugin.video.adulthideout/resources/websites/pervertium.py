@@ -280,50 +280,23 @@ class Pervertium(BaseWebsite):
     def FORMAT_SEARCH_QUERY(self, query):
         return urllib.parse.quote(query.strip().replace(' ', '-'))
 
+    def process_categories(self, url):
+        self.list_categories(url or self.BASE_URL + "categories/")
+
     def list_categories(self, url):
-        all_categories = []
-        page = 1
-        max_pages = 5
-        
-        while page <= max_pages:
-            page_url = f"{self.BASE_URL}categories/{page}/" if page > 1 else f"{self.BASE_URL}categories/"
-            html = self.make_request(page_url)
-            if not html:
-                break
-            
-            blocks = html.split('class="thumb"')[1:]
-            for block in blocks:
-                url_match = self.RE_CAT_URL.search(block)
-                if not url_match:
-                    continue
-                
-                cat_url = url_match.group("url")
-                if not cat_url.startswith('http'):
-                    cat_url = urllib.parse.urljoin(self.BASE_URL, cat_url)
-                
-                name = "Category"
-                title_match = self.RE_TITLE.search(block)
-                if title_match:
-                    name = title_match.group("title").strip()
-                elif 'thumb_string_nowrap' in block:
-                    name_match = re.search(r'<span class="thumb_string_nowrap">([^<]+)</span>', block)
-                    if name_match:
-                        name = name_match.group(1).strip()
-                
-                thumb = ""
-                orig_match = self.RE_THUMB.search(block)
-                if orig_match:
-                    thumb = orig_match.group("thumb")
-                    if not thumb.startswith('http'):
-                        thumb = urllib.parse.urljoin(self.BASE_URL, thumb)
-                
-                all_categories.append((name, cat_url, thumb))
-            
-            if not blocks or f'/categories/{page + 1}/' not in html:
-                break
-            page += 1
-        
-        for name, cat_url, thumb in all_categories:
-            self.add_dir(name, cat_url, 2, thumb if thumb else self.icons['default'])
+        html = self.make_request(url or self.BASE_URL + "categories/")
+        seen = set()
+        pattern = re.compile(
+            r'<a\b[^>]*class="thumb"[^>]*href="([^"]+)"[^>]*title="([^"]+)"[^>]*>'
+            r'([\s\S]{0,1800}?)</a>', re.IGNORECASE
+        )
+        for match in pattern.finditer(html or ""):
+            name, cat_url = match.group(2).strip(), urllib.parse.urljoin(self.BASE_URL, match.group(1))
+            if not name or cat_url in seen:
+                continue
+            seen.add(cat_url)
+            thumb_match = self.RE_THUMB.search(match.group(3))
+            thumb = urllib.parse.urljoin(self.BASE_URL, thumb_match.group("thumb")) if thumb_match else self.icons['default']
+            self.add_dir(name, cat_url, 2, thumb)
         
         self.end_directory()

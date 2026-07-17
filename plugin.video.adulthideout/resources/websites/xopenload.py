@@ -11,6 +11,7 @@ import xbmcplugin
 import requests
 
 from resources.lib.base_website import BaseWebsite
+from resources.lib.proxy_utils import PlaybackGuard, ProxyController
 from resources.lib.resolvers import resolver
 
 
@@ -45,6 +46,7 @@ class XopenloadWebsite(BaseWebsite):
             "AppleWebKit/537.36 (KHTML, like Gecko) "
             "Chrome/128.0.0.0 Safari/537.36"
         )
+        self.proxy_resolved_streams = False
 
     # ------------------------------------------------------------------
     # Helpers
@@ -231,18 +233,21 @@ class XopenloadWebsite(BaseWebsite):
 
         # Search + Categories links (not on search result pages)
         if "?s=" not in url:
-            self.add_dir(
-                "Search", "", 5, self.icons.get("search", self.icon),
-                context_menu=context_menu,
-            )
-            self.add_dir(
-                "Genres", "XOPL_GENRES", 8, self.icons.get("categories", self.icon),
-                context_menu=context_menu,
-            )
-            self.add_dir(
-                "Studios", "XOPL_STUDIOS", 9, self.icons.get("pornstars", self.icon),
-                context_menu=context_menu,
-            )
+            if getattr(self, "show_search", True):
+                self.add_dir(
+                    "Search", "", 5, self.icons.get("search", self.icon),
+                    context_menu=context_menu,
+                )
+            if getattr(self, "show_genres", True):
+                self.add_dir(
+                    "Genres", "XOPL_GENRES", 8, self.icons.get("categories", self.icon),
+                    context_menu=context_menu,
+                )
+            if getattr(self, "show_studios", True):
+                self.add_dir(
+                    "Studios", "XOPL_STUDIOS", 9, self.icons.get("pornstars", self.icon),
+                    context_menu=context_menu,
+                )
 
         videos = self._extract_videos(page_html)
         if not videos:
@@ -275,7 +280,7 @@ class XopenloadWebsite(BaseWebsite):
 
     def process_categories(self, url):
         """Show genre list."""
-        page_html = self._make_request(self.base_url + "/movies/")
+        page_html = self._make_request(getattr(self, "directory_source_url", self.base_url + "/movies/"))
         if not page_html:
             self.notify_error("Could not load XOpenload genres")
             self.end_directory("videos")
@@ -289,7 +294,7 @@ class XopenloadWebsite(BaseWebsite):
 
     def process_pornstars(self, url):
         """Show studio list (mapped to mode=9 / pornstars slot)."""
-        page_html = self._make_request(self.base_url + "/movies/")
+        page_html = self._make_request(getattr(self, "directory_source_url", self.base_url + "/movies/"))
         if not page_html:
             self.notify_error("Could not load XOpenload studios")
             self.end_directory("videos")
@@ -404,7 +409,22 @@ class XopenloadWebsite(BaseWebsite):
             return
 
         play_url = stream_url
-        if "|" not in play_url and headers:
+        if self.proxy_resolved_streams and ".m3u8" not in stream_url.lower():
+            try:
+                controller = ProxyController(
+                    stream_url,
+                    upstream_headers=headers,
+                    use_urllib=True,
+                    probe_size=True,
+                )
+                play_url = controller.start()
+                PlaybackGuard(
+                    xbmc.Player(), xbmc.Monitor(), play_url, controller
+                ).start()
+            except Exception as exc:
+                self.logger.warning("[XOpenload] Stream proxy failed: %s", exc)
+                play_url = stream_url
+        if play_url == stream_url and "|" not in play_url and headers:
             play_url = self._append_headers(play_url, headers)
 
         list_item = xbmcgui.ListItem(path=play_url)

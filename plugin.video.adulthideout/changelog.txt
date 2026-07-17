@@ -1,3 +1,13 @@
+v. 1.0.17 "Stronghold" - 2026-07-17
+- **Introducing Vault**: Save videos and folders from any supported site or Global Search into Watch Later and custom collections. Batch selection, management, search, removal and portable backup/restore are built in.
+- **Download Center, Polished**: Follow active downloads with native background progress, speed and ETA, then manage the queue and history from Kodi. Main-menu visibility and progress-display duration remain fully configurable.
+- **Global Search, Rebuilt**: Cached source selection, in-result filtering, relevance/title/source sorting and duplicate removal now work without repeating the original search.
+- **25 New Sites**: Added Stripchat, PandaMovies, Siska, JustFullPorn, XXVideoss, NetFapX, 4kPorn, InPorn, SexTVx, PornVe, PornRabbit, CherryGasp, FapNFuck, JustPorn, Porn4Days, Movie4Days, 321Tube, AllClassic, Bingato, BornToBeFuck, MegaTube, OGPorn, XMegaDrive, ViralXXXPorn and Xozilla.
+- **Site Highlights**: Stripchat uses its public live API and excludes paid shows; NetFapX and InPorn use first-party APIs; 4kPorn and SexTVx use seekable own-hosted streams; PandaMovies, Siska, JustFullPorn and XXVideoss provide preferred multi-resolver fallback.
+- **Playback Engine**: Added global quality preferences, opt-in Range-proxy playback, centralized mirror preflight/fallback, Bigwarp and zero-dependency Vsonic resolution, plus support for newer HTML video-source KVS players.
+- **Fixes & Polish**: Restored AllPornStream search, MissAV Vault actions, PornoBae pagination and protected PornoBae/HQPornero artwork; repaired CherryGasp navigation and refreshed recent 352x352 site artwork.
+- **Localization**: Vault and Download Center are fully available in English, German, Spanish and French.
+
 v. 1.0.16 "Cartographer" - 2026-07-09
 - **New Sites**: Added 12 full-length tubes — AnyPorn, WhoresHub, Fuqster, FreeonesTube, PornKTube, CollectionOfBestPorn, YourLust, XXBrits, PornXP, Sextu, Neporn and YouPerv — each with categories, search, sorting/pagination and proxied playback, and each vetted (front-page duration histogram plus ffprobe spot-checks) for full videos rather than truncated preview clips.
 - **Site Fixes**: ThisVid (proxied expiring streams for smoother seeking), Fapality (category routes and parsing), InXXX (pagination and thumbnail headers), XFreeHD (search type), LuxureTV (restored listings/search/categories/thumbnails), 85po (protected-artwork proxy), CamCaps (moved to camcaps.io), LetMeJerk (moved to letmejizz.co) and SpankBang (cloudscraper for the stricter regional bot-check).

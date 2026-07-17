@@ -11,6 +11,7 @@ import xbmcplugin
 import sys
 from resources.lib.base_website import BaseWebsite
 from resources.lib.proxy_utils import PlaybackGuard, ProxyController
+from resources.lib.playback_preferences import select_quality_variant
 vendor_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "lib", "vendor")
 if os.path.isdir(vendor_path) and vendor_path not in sys.path:
     sys.path.insert(0, vendor_path)
@@ -266,9 +267,10 @@ class Po85(BaseWebsite):
 
         resolved_url = ""
         if scrambled_links:
-            # Sort by quality descending (prefer 720p over 360p)
-            scrambled_links.sort(key=lambda x: x[1], reverse=True)
-            best_scrambled = scrambled_links[0][0]
+            best_scrambled = select_quality_variant(
+                [(quality, stream) for stream, quality in scrambled_links],
+                self.addon,
+            )
             
             if best_scrambled.startswith("function/0/") and kvs_decode_url is not None and license_code:
                 try:

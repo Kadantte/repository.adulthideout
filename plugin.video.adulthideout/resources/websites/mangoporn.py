@@ -15,6 +15,7 @@ from resources.lib.base_website import BaseWebsite
 from resources.lib.proxy_utils import PlaybackGuard, ProxyController
 from resources.lib.resilient_http import fetch_text
 from resources.lib.resolvers import resolver
+from resources.lib.playback_preferences import order_quality_variants
 
 
 class MangoPorn(BaseWebsite):
@@ -156,7 +157,7 @@ class MangoPorn(BaseWebsite):
             pattern = r"https?://[^\"'\\]+\.(?:bkcdn|bxcdn)\.net/[^\"'\\<\s]+\.mp4[^\"'\\<\s]*"
             streams = [(0, html.unescape(m.group(0))) for m in re.finditer(pattern, content or "", re.I)]
         result, seen = [], set()
-        for _, stream in sorted(streams, key=lambda item: item[0], reverse=True):
+        for _, stream in order_quality_variants(streams, self.addon):
             if stream not in seen:
                 seen.add(stream)
                 result.append(stream)
@@ -175,19 +176,14 @@ class MangoPorn(BaseWebsite):
             if host_url not in seen:
                 seen.add(host_url)
                 links.append(host_url)
-        for host_url in resolver.sort_urls_by_resolver_preference(links, self.addon):
-            try:
-                result = resolver.resolve(host_url, referer=url, headers={"User-Agent": self.ua, "Referer": url})
-                if isinstance(result, tuple):
-                    stream_url, headers = result
-                else:
-                    stream_url, headers = result, {}
-                if stream_url and stream_url.startswith("http"):
-                    if resolver.resolver_preflight_enabled(self.addon) and not resolver.probe_resolved_stream(stream_url, headers):
-                        continue
-                    return {"url": stream_url, "headers": headers or {}, "extension": "mp4"}
-            except Exception as exc:
-                self.logger.warning("MangoPorn resolver failed for %s: %s", host_url, exc)
+        stream_url, headers, _ = resolver.resolve_first_working(
+            links,
+            referer=url,
+            headers={"User-Agent": self.ua, "Referer": url},
+            addon=self.addon,
+        )
+        if stream_url:
+            return {"url": stream_url, "headers": headers, "extension": "mp4"}
         return None
 
     def play_video(self, url):

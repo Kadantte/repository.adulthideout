@@ -34,7 +34,7 @@ class AllPornStream(BaseWebsite):
         super().__init__(
             name="allpornstream",
             base_url="https://allpornstream.com",
-            search_url="https://allpornstream.com/search?q={}",
+            search_url="https://allpornstream.com/?q={}",
             addon_handle=addon_handle,
             addon=addon,
         )
@@ -637,19 +637,14 @@ class AllPornStream(BaseWebsite):
         page_html = self._make_request(url)
         if not page_html:
             return None
-        for host_url in self._extract_host_links(page_html):
-            try:
-                result = resolver.resolve(host_url, referer=url, headers={"User-Agent": self.ua, "Referer": url})
-                if isinstance(result, tuple):
-                    stream_url, headers = result
-                else:
-                    stream_url, headers = result, {}
-                if stream_url and stream_url.startswith("http"):
-                    if resolver.resolver_preflight_enabled(self.addon) and not resolver.probe_resolved_stream(stream_url, headers):
-                        continue
-                    return {"url": stream_url, "headers": headers or {}, "extension": "mp4"}
-            except Exception as exc:
-                self.logger.warning("[AllPornStream] Resolver failed for %s: %s", host_url[:80], exc)
+        stream_url, headers, _ = resolver.resolve_first_working(
+            self._extract_host_links(page_html),
+            referer=url,
+            headers={"User-Agent": self.ua, "Referer": url},
+            addon=self.addon,
+        )
+        if stream_url:
+            return {"url": stream_url, "headers": headers, "extension": "mp4"}
         if self._has_mydaddy_mirror(page_html):
             self.logger.info("[AllPornStream] MyDaddy mirror found but no playable stream resolved for %s", url)
         return None

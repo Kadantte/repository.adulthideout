@@ -38,6 +38,7 @@ except Exception as e:
     _HAS_CF = False
 
 import requests
+from resources.lib.playback_preferences import preferred_quality, select_quality_variant
 
 # Kleinere Chunks (32 KB) damit read() schneller zurückkehrt — kritisch für Seeks!
 # 512 KB blockiert zu lange wenn mehrere Streams parallel laufen.
@@ -575,11 +576,28 @@ class _Upstream:
                     elif isinstance(data, list) and len(data) > 0:
                         best = None
                         default_found = False
+                        preferred = preferred_quality()
+
+                        if preferred:
+                            variants = []
+                            for item in data:
+                                if not isinstance(item, dict) or not item.get('videoUrl'):
+                                    continue
+                                try:
+                                    quality = int(str(item.get('quality', '0')))
+                                except (ValueError, TypeError):
+                                    quality = 0
+                                variants.append((quality, item))
+                            selected = select_quality_variant(variants)
+                            if selected:
+                                best = selected
                         
                         for item in data:
                             if not isinstance(item, dict):
                                 continue
                             
+                            if best is not None:
+                                break
                             if item.get('defaultQuality') is True:
                                 best = item
                                 default_found = True
@@ -844,7 +862,7 @@ class _ProxyHandler(BaseHTTPRequestHandler):
             # --- Schritt 2: Kurze Wartezeit für "schnelles" CDN ---
             # Die meisten CDNs antworten in < 5s. Nur wenn das CDN langsamer ist,
             # kommen wir in den Keep-Alive-Modus mit Chunked-Encoding.
-            FAST_WAIT = 8.0
+            FAST_WAIT = getattr(self.upstream, "fast_wait", 8.0)
             upstream_thread.join(timeout=FAST_WAIT)
 
             if not upstream_thread.is_alive():
@@ -1165,6 +1183,7 @@ class ProxyController:
         skip_resolve=False,
         use_urllib=False,
         probe_size=True,
+        fast_wait=None,
     ):
         if use_urllib:
             self.up = _UrllibUpstream(
@@ -1183,6 +1202,8 @@ class ProxyController:
             )
         self.host = host
         self.port = port
+        if fast_wait is not None:
+            self.up.fast_wait = max(0.1, float(fast_wait))
         self.httpd = None
         self.thread = None
         self.local_url = None
@@ -1350,57 +1371,69 @@ class _HlsProxyHandler(BaseHTTPRequestHandler):
         parsed = urllib.parse.urlparse(self.path)
         query = urllib.parse.parse_qs(parsed.query)
         
-        headers = {
-            "User-Agent": _DEFAULT_UA,
-            "Referer": "https://88z.io/",
-            "Origin": "https://88z.io",
-        }
+        headers = dict(getattr(self.controller, "headers", {}) or {})
+        headers.setdefault("User-Agent", _DEFAULT_UA)
         
         try:
-            if parsed.path == "/playlist.m3u8":
-                url = query.get("url")[0]
-                res = requests.get(url, headers=headers, timeout=12)
-                lines = []
-                for line in res.text.splitlines():
-                    if line.strip() and not line.startswith("#"):
-                        segment_url = urllib.parse.urljoin(url, line.strip())
-                        proxy_segment_url = "http://127.0.0.1:{}/segment?url={}".format(
-                            self.server.server_address[1],
-                            urllib.parse.quote_plus(segment_url)
-                        )
-                        lines.append(proxy_segment_url)
-                    else:
+            if parsed.path in ("/playlist.m3u8", "/resource"):
+                url = query.get("url", [""])[0]
+                if not url:
+                    self.send_error(400, "Missing URL")
+                    return
+                if urllib.parse.urlparse(url).netloc.lower().endswith("googleusercontent.com"):
+                    headers["Referer"] = "https://turboviplay.com/"
+                    headers.pop("Origin", None)
+                session = getattr(self.controller, "session", None) or requests
+                with self.controller.request_lock:
+                    res = session.get(url, headers=headers, timeout=20)
+                res.raise_for_status()
+
+                if res.content.startswith(b"#EXTM3U"):
+                    playlist = res.content.decode("utf-8", "replace")
+                    lines = []
+                    for line in playlist.splitlines():
+                        if line.strip() and not line.startswith("#"):
+                            resource_url = urllib.parse.urljoin(url, line.strip())
+                            line = "http://{}:{}/resource?url={}".format(
+                                self.controller.host,
+                                self.server.server_address[1],
+                                urllib.parse.quote_plus(resource_url),
+                            )
                         lines.append(line)
-                
-                content = "\n".join(lines).encode("utf-8")
+                    content = "\n".join(lines).encode("utf-8")
+                    self.send_response(200)
+                    self.send_header("Content-Type", "application/vnd.apple.mpegurl")
+                    self.send_header("Content-Length", str(len(content)))
+                    self.send_header("Cache-Control", "no-store")
+                    self.end_headers()
+                    self.wfile.write(content)
+                    return
+
+                content = res.content
+                if content.startswith(b"\x89PNG\r\n\x1a\n"):
+                    pos = 8
+                    while pos + 12 <= len(content):
+                        chunk_size = int.from_bytes(content[pos:pos + 4], "big")
+                        chunk_type = content[pos + 4:pos + 8]
+                        pos += chunk_size + 12
+                        if chunk_type == b"IEND":
+                            content = content[pos:]
+                            break
+                    for offset in range(min(4096, max(0, len(content) - 376))):
+                        if (
+                            content[offset] == 0x47
+                            and content[offset + 188] == 0x47
+                            and content[offset + 376] == 0x47
+                        ):
+                            content = content[offset:]
+                            break
+
                 self.send_response(200)
-                self.send_header("Content-Type", "application/vnd.apple.mpegurl")
+                self.send_header("Content-Type", res.headers.get("Content-Type", "video/mp2t"))
                 self.send_header("Content-Length", str(len(content)))
                 self.send_header("Cache-Control", "no-store")
                 self.end_headers()
                 self.wfile.write(content)
-                
-            elif parsed.path == "/segment":
-                url = query.get("url")[0]
-                res = requests.get(url, headers=headers, stream=True, timeout=15)
-                self.send_response(200)
-                self.send_header("Content-Type", "video/mp2t")
-                self.send_header("Cache-Control", "no-store")
-                self.end_headers()
-                
-                first_chunk_read = False
-                for chunk in res.iter_content(chunk_size=PROXY_CHUNK):
-                    if getattr(self.server, '_shutting_down', False):
-                        break
-                    if not first_chunk_read:
-                        first_chunk_read = True
-                        if chunk.startswith(b"\x89PNG"):
-                            chunk = chunk[120:]
-                    if chunk:
-                        try:
-                            self.wfile.write(chunk)
-                        except Exception:
-                            break
             else:
                 self.send_error(404, "Not Found")
         except Exception as e:
@@ -1412,8 +1445,11 @@ class _HlsProxyHandler(BaseHTTPRequestHandler):
 
 
 class HlsProxyController:
-    def __init__(self, master_playlist_url, host="127.0.0.1", port=0):
+    def __init__(self, master_playlist_url, headers=None, session=None, host="127.0.0.1", port=0):
         self.master_url = master_playlist_url
+        self.headers = headers or {}
+        self.session = session or requests.Session()
+        self.request_lock = threading.Lock()
         self.host = host
         self.port = port
         self.httpd = None

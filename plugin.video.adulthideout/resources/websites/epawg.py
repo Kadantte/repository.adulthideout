@@ -13,6 +13,7 @@ import xbmcplugin
 from resources.lib.base_website import BaseWebsite
 from resources.lib.decoders.kvs_decoder import kvs_decode_url
 from resources.lib.resilient_http import fetch_text
+from resources.lib.playback_preferences import order_quality_variants
 
 
 class Epawg(BaseWebsite):
@@ -267,7 +268,7 @@ class Epawg(BaseWebsite):
             if stream_url and stream_url not in seen:
                 seen.add(stream_url)
                 deduped.append((quality, stream_url))
-        return [url for _, url in deduped]
+        return [url for _, url in order_quality_variants(deduped, self.addon)]
 
     def resolve_recording_stream(self, url):
         detail_html = self._get(url, referer=self.base_url)

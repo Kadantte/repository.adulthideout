@@ -14,8 +14,20 @@ import xbmcgui
 
 
 PORT_PROPERTY = "AdultHideout.ThumbProxyPort"
-ALLOWED_HOSTS = frozenset(("85po.com", "www.85po.com", "i.pornktube.com"))
-ALLOWED_PATH_PREFIX = "/contents/videos_screenshots/"
+ALLOWED_HOSTS = frozenset((
+    "85po.com",
+    "www.85po.com",
+    "i.pornktube.com",
+    "cdn.pornve.com",
+    "st.4kporn.xxx",
+    "hqpornero.com",
+    "pornobae.com",
+))
+ALLOWED_PATH_PREFIXES = (
+    "/contents/videos_screenshots/",
+    "/avatar/",
+    "/wp-content/uploads/",
+)
 SESSION_COUNT = 4
 
 _vendor = os.path.join(os.path.dirname(__file__), "vendor")
@@ -88,12 +100,21 @@ def _valid_image_url(url):
             and parsed.hostname
             and parsed.hostname.lower() in ALLOWED_HOSTS
             and parsed.port in (None, 443)
-            and parsed.path.startswith(ALLOWED_PATH_PREFIX)
+            and parsed.path.startswith(ALLOWED_PATH_PREFIXES)
             and not parsed.username
             and not parsed.password
         )
     except (TypeError, ValueError):
         return False
+
+
+def _normalize_image(upstream, content_type):
+    """Correct a CDN MIME lie so Kodi selects its WebP decoder."""
+    body = upstream.content
+    is_mislabeled_webp = (
+        content_type == "image/jpeg" and body.startswith(b"RIFF") and b"WEBP" in body[:16]
+    )
+    return body, "image/webp" if is_mislabeled_webp else content_type
 
 
 class _Handler(BaseHTTPRequestHandler):
@@ -134,14 +155,14 @@ class _Handler(BaseHTTPRequestHandler):
             "Accept-Encoding": "identity",
         }
         try:
-            upstream = session.get(url, headers=headers, timeout=(5, 15), stream=True)
+            upstream = session.get(url, headers=headers, timeout=(5, 15))
             content_type = upstream.headers.get("Content-Type", "").split(";", 1)[0].lower()
             if upstream.status_code != 200 or not content_type.startswith("image/"):
                 # CDN gated by the domain-wide cf_clearance cookie: obtain it once
                 # (serialized + shared across sessions), then retry the image.
                 upstream.close()
                 _ensure_clearance(session, referer)
-                upstream = session.get(url, headers=headers, timeout=(5, 15), stream=True)
+                upstream = session.get(url, headers=headers, timeout=(5, 15))
                 content_type = upstream.headers.get("Content-Type", "").split(";", 1)[0].lower()
             with upstream:
                 if upstream.status_code != 200 or not content_type.startswith("image/"):
@@ -149,19 +170,16 @@ class _Handler(BaseHTTPRequestHandler):
                     self.send_error(502)
                     return
 
+                body, content_type = _normalize_image(upstream, content_type)
                 self.send_response(200)
                 self.send_header("Content-Type", content_type)
-                length = upstream.headers.get("Content-Length")
-                if length and length.isdigit():
-                    self.send_header("Content-Length", length)
+                self.send_header("Content-Length", str(len(body)))
                 self.send_header("Connection", "close")
                 self.end_headers()
                 response_started = True
 
                 if send_body:
-                    for chunk in upstream.iter_content(chunk_size=65536):
-                        if chunk:
-                            self.wfile.write(chunk)
+                    self.wfile.write(body)
         except (BrokenPipeError, ConnectionResetError):
             pass
         except Exception as exc:

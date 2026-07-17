@@ -59,6 +59,59 @@ class PornoBae(BaseWebsite):
         value = re.sub(r"\s+", " ", value)
         return value.strip()
 
+    def _thumbnail_url(self, value):
+        thumb = self._absolute(value)
+        if not thumb:
+            return self.icon
+        try:
+            from resources.lib.thumb_proxy import build_thumb_url
+            proxied = build_thumb_url(thumb, referer=self.base_url)
+            if proxied != thumb:
+                return proxied
+            return "{}|User-Agent={}&Referer={}".format(
+                thumb,
+                urllib.parse.quote(self.ua),
+                urllib.parse.quote(self.base_url),
+            )
+        except Exception:
+            return thumb
+
+    def _get_api_page(self, page):
+        url = self._absolute(
+            "/wp-json/wp/v2/posts?per_page=36&page={}&_embed=wp:featuredmedia".format(page)
+        )
+        try:
+            response = self.session.get(url, headers=self._headers(), timeout=20)
+            if response.status_code != 200:
+                self.logger.warning("[pornobae] API HTTP %s for page %s", response.status_code, page)
+                return [], 0
+            return response.json(), int(response.headers.get("X-WP-TotalPages") or 0)
+        except (ValueError, TypeError, requests.RequestException) as exc:
+            self.logger.warning("[pornobae] API page %s failed: %s", page, exc)
+            return [], 0
+
+    def _extract_api_videos(self, posts):
+        videos = []
+        for post in posts or []:
+            title = self._clean((post.get("title") or {}).get("rendered"))
+            video_url = self._absolute(post.get("link"))
+            if not title or not video_url:
+                continue
+            thumb = ""
+            media = ((post.get("_embedded") or {}).get("wp:featuredmedia") or [])
+            if media:
+                details = media[0].get("media_details") or {}
+                sizes = details.get("sizes") or {}
+                selected = sizes.get("post-thumbnail") or sizes.get("medium") or {}
+                thumb = selected.get("source_url") or media[0].get("source_url") or ""
+            videos.append({
+                "label": title,
+                "url": video_url,
+                "thumb": self._thumbnail_url(thumb),
+                "info": {"title": title, "plot": self._clean((post.get("excerpt") or {}).get("rendered")) or title},
+            })
+        return videos
+
     def _is_top_listing(self, url):
         parsed = urllib.parse.urlparse(url or self.base_url)
         query = urllib.parse.parse_qs(parsed.query)
@@ -102,7 +155,7 @@ class PornoBae(BaseWebsite):
             seen.add(video_url)
             
             img_match = re.search(r'<img\b[^>]+src=["\']([^"\']+)["\']', curr_part, re.IGNORECASE)
-            thumb = self._absolute(img_match.group(1)) if img_match else ""
+            thumb = self._thumbnail_url(img_match.group(1)) if img_match else ""
             
             duration_match = re.search(r'class=["\']duration["\'][^>]*>([\s\S]*?)</span>', curr_part, re.IGNORECASE)
             duration = self._clean(duration_match.group(1)) if duration_match else ""
@@ -139,14 +192,21 @@ class PornoBae(BaseWebsite):
             self.add_dir("Search", "", 5, self.icons.get("search", self.icon))
             self.add_dir("Categories", self._absolute("/categories/"), 8, self.icons.get("categories", self.icon))
 
-        target_url = self.get_page_url(url, page)
-        page_html = self._get(target_url)
-        if not page_html:
+        use_api = self._is_top_listing(url) and page > 1
+        api_total_pages = 0
+        if use_api:
+            posts, api_total_pages = self._get_api_page(page)
+            videos = self._extract_api_videos(posts)
+            page_html = ""
+        else:
+            target_url = self.get_page_url(url, page)
+            page_html = self._get(target_url)
+            videos = self._extract_videos(page_html) if page_html else []
+        if not page_html and not use_api:
             self.notify_error("Could not load PornoBae content")
             self.end_directory("videos")
             return
 
-        videos = self._extract_videos(page_html)
         if not videos:
             self.notify_error("No PornoBae videos found")
             self.end_directory("videos")
@@ -162,7 +222,10 @@ class PornoBae(BaseWebsite):
                 info_labels=item["info"]
             )
 
-        next_url = self._extract_next_page(page_html, url, page)
+        if self._is_top_listing(url):
+            next_url = url if page == 1 or page < api_total_pages else ""
+        else:
+            next_url = self._extract_next_page(page_html, url, page)
         if next_url:
             self.add_dir("Next Page", url, 2, self.icons.get("default", self.icon), page=page + 1)
 

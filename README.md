@@ -2,58 +2,53 @@
   <img src="repository.adulthideout/resources/fanart.jpg" alt="AdultHideout 10th Anniversary" width="100%">
 </p>
 
-<h1 align="center">AdultHideout 1.0.16</h1>
+<h1 align="center">AdultHideout 1.0.17</h1>
 <p align="center">
-  <strong>Cartographer</strong><br>
-  More paths. Better playback.<br>
-  Released July 9, 2026.
+  <strong>Stronghold</strong><br>
+  Everything worth keeping. One Vault.<br>
+  Released July 17, 2026.
 </p>
 
-AdultHideout started in **January 2016** as a tiny personal Kodi addon for one site. In its **10th Anniversary Year**, the 1.0.15 Harbor release made downloading and offline playback a first-class part of the addon. Cartographer builds on that foundation with broader source coverage and a more resilient runtime.
+AdultHideout started in **January 2016** as a tiny personal Kodi addon for one site. Ten years later, Stronghold is built around one simple idea: finding a video should not mean losing it again.
 
-**Cartographer** adds twelve carefully integrated sources, fixes difficult playback and thumbnail paths, strengthens Cloudscraper compatibility, and refines Global Search and startup performance. The download and Offline videos foundation from Harbor remains available.
+**Vault** gives every supported site and Global Search one shared destination for the things you want to keep. The polished **Download Center** takes it from there, with a clear queue, useful progress and offline playback when you want it.
 
 ## Featured Highlights
 
-### Download Manager. Built In.
+### Introducing Vault
 
-Downloads now run as a managed background queue with clear progress, cancellation and retry controls. AdultHideout validates the destination before writing and remembers the workflow, so downloading feels like part of Kodi rather than an external workaround.
+One place for everything you want to return to. Save videos or complete folders from any supported site, build **Watch Later** and custom collections, select multiple items at once and find them again with Vault search.
 
-### Your Storage. Your Choice.
+Your library stays manageable. Missing entries can be removed, collections can be reorganized, and portable backup and restore lets your Vault move with you.
 
-Choose a local folder or send downloads directly to **SMB** and **NFS** storage. The internal downloader remains the simple default, while FFmpeg, aria2 and JDownloader are available as optional backends for advanced setups.
+### From Search To Saved In Seconds
 
-### Offline Videos. Ready When You Are.
+Global Search now leads naturally into Vault. Filter the results you already have, sort them, remove duplicates and save several discoveries together without repeating the original search.
 
-Enable **Offline videos** to replay completed downloads directly from AdultHideout. It stays disabled by default and only appears when you decide to use it.
+### Download Center. Quietly In Control.
 
-### Twelve New Sources
+Start a download and keep using Kodi. A compact background display shows the title, percentage, speed and ETA, then gets out of the way according to your settings. The queue and history remain one action away whenever you need them.
 
-**AnyPorn, WhoresHub, Fuqster, FreeonesTube, PornKTube, CollectionOfBestPorn, YourLust, XXBrits, PornXP, Sextu, Neporn and YouPerv.**
+Pause the clutter, not the download. Download Center can appear only while work is active or stay permanently available. Cancellation, retry and history remain built in.
 
-Every new integration was built around its actual site structure, with the navigation it supports: search, categories, models or performers, sorting and pagination. Playback prefers the best usable source and uses seek-safe proxy handling where the host requires it.
+### Yours, Even Offline
 
-XFreeHD excludes login-only cards, XGroovy and TrannyVideosXXX include populated model directories, and SexVid ships with its real JPEG thumbnails.
+Choose a local folder or send downloads directly to **SMB** and **NFS** storage. Completed files can return through the optional **Offline videos** view, while FFmpeg, aria2 and JDownloader remain available for advanced setups.
 
-## More Refined Everywhere
+### 25 New Sources
 
-- **Global Search:** Fixed cross-search cache bleed, restored search scope correctly, kept playable results clean and removed the obsolete version-specific preset.
-- **Cloudflare and Playback:** Repaired challenge-math handling for newer Python versions, improved protected artwork, and made slow or expiring CDN streams more dependable.
-- **Navigation and Performance:** Cached repository metadata and indexed logo lookups to reduce repeated network and filesystem work.
-- **Site Maintenance:** Updated domains and repaired pagination, categories, thumbnails and missing imports across several existing integrations.
-- **Language Polish:** Removed hard-coded German fallback text from otherwise English navigation and dialogs.
-- **Release Integrity:** Refreshed settings, logos, manifests, official hashes and repository metadata.
+**Stripchat, PandaMovies, Siska, JustFullPorn, XXVideoss, NetFapX, 4kPorn, InPorn, SexTVx, PornVe, PornRabbit, CherryGasp, FapNFuck, JustPorn, Porn4Days, Movie4Days, 321Tube, AllClassic, Bingato, BornToBeFuck, MegaTube, OGPorn, XMegaDrive, ViralXXXPorn and Xozilla.**
 
-## Feature Focus: Cartographer
+Twenty-five new integrations give Vault and Global Search more places to discover. Each one arrives with its own artwork and the navigation its site supports.
 
-Downloading is intentionally simple on first use:
+## Also Included
 
-1. Choose **Download video** from a supported video's context menu.
-2. Select a destination the first time the feature is used.
-3. Follow progress in the Download Manager.
-4. Replay the completed file from the optional **Offline videos** view.
+- **Better playback choices:** Global quality preferences and mirror fallback help select a usable stream before playback begins.
+- **Cleaner navigation:** Vault and Download Center stay close when needed without permanently crowding the main menu.
+- **Localized features:** Vault and Download Center are available in English, German, Spanish and French.
+- **Release integrity:** Settings, artwork, manifests and official SHA-256 hashes are aligned with the release package.
 
-Advanced integrations remain opt-in. A normal user can choose a folder and download without installing or configuring aria2, JDownloader or another external tool.
+Advanced download and proxy integrations remain opt-in. A normal user can use Vault, choose a folder and download without configuring an external tool.
 
 ---
 
@@ -105,6 +100,16 @@ For repository issues, use GitHub Issues. For copyright complaints regarding con
 
 <details>
 <summary><strong>Recent release archive</strong></summary>
+
+### 1.0.16 "Cartographer" - 2026-07-09
+
+- Added twelve carefully integrated sources and repaired several difficult playback, Cloudflare and thumbnail paths.
+- Improved Global Search state handling, startup performance and cross-platform runtime compatibility.
+
+### 1.0.15 "Harbor" - 2026-06-27
+
+- Introduced the managed Download Manager, local/SMB/NFS destinations and optional FFmpeg, aria2 and JDownloader backends.
+- Added the opt-in Offline videos view and first-use destination validation.
 
 ### 1.0.14 "Featherlight" - 2026-06-14
 

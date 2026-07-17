@@ -213,6 +213,13 @@ class MissavWebsite(BaseWebsite):
                 
             full_video_url = urllib_parse.urljoin(self.base_url, video_url)
             plugin_url = f"plugin://plugin.video.adulthideout/?url={urllib_parse.quote_plus(full_video_url)}&mode=4&website={self.name}"
+            try:
+                from resources.lib.personal_library import build_save_command
+                li.addContextMenuItems([(self.addon.getLocalizedString(30706) or 'Save to Vault', build_save_command(
+                    sys.argv[0], plugin_url, name, self.name, thumbnail, self.fanart, 'video'
+                ))])
+            except Exception as exc:
+                self.logger.warning("Vault context failed: %s", exc)
             xbmcplugin.addDirectoryItem(self.addon_handle, plugin_url, li, isFolder=False)
             
         next_page_match = re.search(r'<a href="([^"]+)" rel="next"', content)

@@ -271,7 +271,15 @@ class Drtuber(BaseWebsite):
             li = self.add_context_menu(li, include_sort_by=can_sort)
             
             url_params = {'mode': '4', 'website': self.name, 'url': video_url, 'video_id': video_id}
-            xbmcplugin.addDirectoryItem(handle=self.addon_handle, url=f"{sys.argv[0]}?{urllib.parse.urlencode(url_params)}", listitem=li, isFolder=False)
+            target_url = f"{sys.argv[0]}?{urllib.parse.urlencode(url_params)}"
+            try:
+                from resources.lib.personal_library import build_save_command
+                li.addContextMenuItems([(self.addon.getLocalizedString(30706) or 'Save to Vault', build_save_command(
+                    sys.argv[0], target_url, title, self.name, thumb, self.fanart, 'video'
+                ))])
+            except Exception as exc:
+                self.logger.warning("Vault context failed: %s", exc)
+            xbmcplugin.addDirectoryItem(handle=self.addon_handle, url=target_url, listitem=li, isFolder=False)
         
         next_page = self.next_page_pattern.search(html)
         next_url = None

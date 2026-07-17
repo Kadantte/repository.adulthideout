@@ -14,6 +14,7 @@ import xbmcplugin
 from resources.lib.base_website import BaseWebsite
 from resources.lib.proxy_utils import PlaybackGuard, ProxyController
 from resources.lib.resilient_http import fetch_text
+from resources.lib.playback_preferences import order_quality_variants
 
 
 class JizzBerry(BaseWebsite):
@@ -244,7 +245,7 @@ class JizzBerry(BaseWebsite):
 
         deduped = []
         seen = set()
-        for _, stream_url in sorted(streams, key=lambda item: item[0], reverse=True):
+        for _, stream_url in order_quality_variants(streams, self.addon):
             if stream_url and stream_url not in seen:
                 seen.add(stream_url)
                 deduped.append(stream_url)

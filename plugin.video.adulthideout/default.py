@@ -25,8 +25,9 @@ WEBSITES_DIR = os.path.join(RESOURCES_DIR, 'websites')
 LOGOS_DIR = os.path.join(RESOURCES_DIR, 'logos')
 FANART_PATH = os.path.join(LOGOS_DIR, 'fanart.jpg')
 DEFAULT_ICON_PATH = os.path.join(LOGOS_DIR, 'icon.png')
+VAULT_ICON_PATH = os.path.join(LOGOS_DIR, 'vault.png')
 VIEW_SERVICE_PATH = os.path.join(ADDON_PATH, 'resources', 'lib', 'view_service.py')
-VIEW_SERVICE_VERSION = "16"
+VIEW_SERVICE_VERSION = "18"
 
 dns_retry.install()
 
@@ -73,6 +74,11 @@ def build_main_menu_fast():
     if "search.png" not in available_logos:
         global_search_icon = DEFAULT_ICON_PATH
     global_search_item.setArt({"icon": global_search_icon, "thumb": global_search_icon, "fanart": FANART_PATH})
+    download_menu_command = 'Container.Update({}?mode=31)'.format(sys.argv[0])
+    global_search_item.addContextMenuItems([(
+        ADDON.getLocalizedString(30733) or "Open Download Manager",
+        download_menu_command,
+    )])
     xbmcplugin.addDirectoryItem(
         handle=ADDON_HANDLE,
         url=f"{sys.argv[0]}?mode=20&website=global_search",
@@ -80,7 +86,28 @@ def build_main_menu_fast():
         isFolder=True,
     )
 
-    if ADDON.getSetting("show_download_manager") == "true":
+    vault_item = xbmcgui.ListItem(label="[COLOR yellow]{}[/COLOR]".format(ADDON.getLocalizedString(30700) or "Vault"))
+    vault_icon = VAULT_ICON_PATH if os.path.exists(VAULT_ICON_PATH) else DEFAULT_ICON_PATH
+    vault_item.setArt({"icon": vault_icon, "thumb": vault_icon, "fanart": FANART_PATH})
+    vault_item.addContextMenuItems([(
+        ADDON.getLocalizedString(30733) or "Open Download Manager",
+        download_menu_command,
+    )])
+    xbmcplugin.addDirectoryItem(
+        handle=ADDON_HANDLE,
+        url=f"{sys.argv[0]}?mode=40",
+        listitem=vault_item,
+        isFolder=True,
+    )
+
+    show_downloads = ADDON.getSetting("show_download_manager") == "true"
+    if not show_downloads:
+        try:
+            from resources.lib.download_manager import has_active_downloads
+            show_downloads = has_active_downloads()
+        except Exception as exc:
+            log("Could not inspect download history: {}".format(exc), xbmc.LOGDEBUG)
+    if show_downloads:
         downloads_item = xbmcgui.ListItem(label="[COLOR yellow]{}[/COLOR]".format(
             ADDON.getLocalizedString(30641) or "Downloads"
         ))
@@ -127,7 +154,8 @@ def build_main_menu_fast():
 
         context_menu = [
             ('Sort by...', f'RunPlugin({sys.argv[0]}?mode=7&action=select_sort&website={module_raw_name})'),
-            ('Change Content...', f'RunPlugin({sys.argv[0]}?mode=7&action=select_content_type&website={module_raw_name})')
+            ('Change Content...', f'RunPlugin({sys.argv[0]}?mode=7&action=select_content_type&website={module_raw_name})'),
+            (ADDON.getLocalizedString(30733) or 'Open Download Manager', download_menu_command),
         ]
         if module_raw_name == 'chaturbate':
             context_menu.append(
@@ -260,6 +288,17 @@ def handle_routing():
             except Exception:
                 page = 1
             global_search.refresh_search(params.get('query', ''), page=page, search_mode=params.get('search_mode', 'selected'))
+        elif action == 'select_page_to_vault':
+            global_search.select_page_to_vault(
+                params.get('query', ''),
+                page=params.get('page', '1'),
+                search_mode=params.get('search_mode', 'selected'),
+            )
+        elif action == 'configure_results':
+            global_search.configure_results(
+                params.get('query', ''),
+                search_mode=params.get('search_mode', 'selected'),
+            )
         elif mode == '21':
             try:
                 page = int(params.get('page', '1') or '1')
@@ -273,6 +312,11 @@ def handle_routing():
             )
         else:
             global_search.show_menu()
+        return
+
+    if mode == '40':
+        from resources.lib.personal_library import PersonalLibrary
+        PersonalLibrary(ADDON_HANDLE, sys.argv[0]).handle(params.get('action'), params)
         return
 
     if mode == '31':
