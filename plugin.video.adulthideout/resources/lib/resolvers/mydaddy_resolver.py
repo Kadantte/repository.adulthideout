@@ -34,6 +34,19 @@ def _extract_mydaddy_url(url):
     return url
 
 
+def _unwrap_mydaddy(url, referer=None, headers=None):
+    if "myxstudio.top" not in (url or "").lower():
+        return url
+    request_headers = _headers(referer or "https://foxnxx.com/")
+    if headers:
+        for key, value in headers.items():
+            if value and key.lower() not in ("range", "referer"):
+                request_headers[key] = value
+    page_html = resolver_utils.http_get(url, headers=request_headers, retries=1, timeout=15)
+    match = re.search(r'<iframe\b[^>]+src=["\']((?:https?:)?//mydaddy\.cc/video/[^"\']+)', page_html or "", re.IGNORECASE)
+    return _normalise_url(match.group(1)) if match else ""
+
+
 def _alt_url(url):
     url = _extract_mydaddy_url(url)
     if "&alt" in url:
@@ -117,6 +130,10 @@ def resolve(url, referer=None, headers=None):
     xbmc.log("[AdultHideout][mydaddy] Resolving stream", xbmc.LOGINFO)
 
     candidates = []
+    url = _unwrap_mydaddy(url, referer=referer, headers=headers)
+    if not url:
+        xbmc.log("[AdultHideout][mydaddy] Wrapper did not expose a MyDaddy player", xbmc.LOGWARNING)
+        return "", {}
     url = _extract_mydaddy_url(url)
     alt = _alt_url(url)
     candidates.append(alt)

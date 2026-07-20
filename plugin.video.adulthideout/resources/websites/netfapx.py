@@ -51,7 +51,11 @@ class NetFapX(BaseWebsite):
         return fetch_text(url, headers=self._headers(referer), logger=self.logger, timeout=20) or ""
 
     def _absolute(self, value):
-        return urllib.parse.urljoin(self.base_url, html.unescape(value or "").strip())
+        absolute = urllib.parse.urljoin(self.base_url, html.unescape(value or "").strip())
+        parsed = urllib.parse.urlsplit(absolute)
+        return urllib.parse.urlunsplit(
+            (parsed.scheme, parsed.netloc, urllib.parse.quote(urllib.parse.unquote(parsed.path), safe="/%"), parsed.query, parsed.fragment)
+        )
 
     @staticmethod
     def _clean(value):

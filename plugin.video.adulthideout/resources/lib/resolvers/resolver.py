@@ -8,11 +8,14 @@ import xbmc
 import xbmcaddon
 
 from resources.lib.resolvers import bigwarp_resolver
+from resources.lib.resolvers import avseeks_resolver
 from resources.lib.resolvers import dirtyvideo_resolver
 from resources.lib.resolvers import doodstream_resolver
 from resources.lib.resolvers import eightyeightz_resolver
 from resources.lib.resolvers import hglink_resolver
+from resources.lib.resolvers import gupload_resolver
 from resources.lib.resolvers import lulustream_resolver
+from resources.lib.resolvers import loadvid_resolver
 from resources.lib.resolvers import mixdrop_resolver
 from resources.lib.resolvers import mydaddy_resolver
 from resources.lib.resolvers import resolver_utils
@@ -23,11 +26,36 @@ from resources.lib.resolvers import vidello_resolver
 from resources.lib.resolvers import voesx_resolver
 from resources.lib.resolvers import vtube_resolver
 from resources.lib.resolvers import tubexplayer_resolver
+from resources.lib.resolvers import upload18_resolver
 from resources.lib.resolvers import watchstreamhd_resolver
 from resources.lib.resolvers import vsonic_resolver
 
 
 RESOLVERS = [
+    {
+        "key": "loadvid",
+        "setting": "",
+        "module": loadvid_resolver,
+        "hosts": ("loadvid.com",),
+    },
+    {
+        "key": "upload18",
+        "setting": "",
+        "module": upload18_resolver,
+        "hosts": ("upload18.org",),
+    },
+    {
+        "key": "avseeks",
+        "setting": "",
+        "module": avseeks_resolver,
+        "hosts": ("av.seeks.cloud",),
+    },
+    {
+        "key": "gupload",
+        "setting": "",
+        "module": gupload_resolver,
+        "hosts": ("gupload.xyz",),
+    },
     {
         "key": "vsonic",
         "setting": "resolver_enable_vsonic",
@@ -68,6 +96,7 @@ RESOLVERS = [
         "hosts": (
             "vidhide.com", "vidhidepre.com", "minochinos.com",
             "callistanise.com", "sunflowercreativeworks.cyou", "ryderjet.com",
+            "morencius.com",
         ),
     },
     {
@@ -90,7 +119,7 @@ RESOLVERS = [
         "key": "mydaddy",
         "setting": "resolver_enable_mydaddy",
         "module": mydaddy_resolver,
-        "hosts": ("mydaddy.cc", "mydaddy"),
+        "hosts": ("mydaddy.cc", "mydaddy", "myxstudio.top"),
     },
     {
         "key": "88z",

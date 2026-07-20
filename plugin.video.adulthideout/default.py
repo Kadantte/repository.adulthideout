@@ -4,6 +4,7 @@
 import sys
 import os
 import time
+import json
 import urllib.parse
 import xbmc
 import xbmcaddon
@@ -27,7 +28,11 @@ FANART_PATH = os.path.join(LOGOS_DIR, 'fanart.jpg')
 DEFAULT_ICON_PATH = os.path.join(LOGOS_DIR, 'icon.png')
 VAULT_ICON_PATH = os.path.join(LOGOS_DIR, 'vault.png')
 VIEW_SERVICE_PATH = os.path.join(ADDON_PATH, 'resources', 'lib', 'view_service.py')
-VIEW_SERVICE_VERSION = "18"
+VIEW_SERVICE_VERSION = "19"
+
+MAIN_MENU_SORT_OPTIONS = ["A-Z", "Z-A", "Newest Websites"]
+WEBSITE_RELEASE_ORDER_PATH = os.path.join(RESOURCES_DIR, "website_release_order.json")
+_website_release_order = None
 
 dns_retry.install()
 
@@ -52,6 +57,42 @@ def ensure_view_service():
 
 def get_setting_id_from_name(name):
     return f"show_{name.lower().replace('-', '').replace('_', '')}"
+
+def get_main_menu_sort_index():
+    try:
+        index = int(ADDON.getSetting("main_menu_website_sort") or "0")
+    except (TypeError, ValueError):
+        index = 0
+    return index if 0 <= index < len(MAIN_MENU_SORT_OPTIONS) else 0
+
+def get_website_release_order():
+    global _website_release_order
+    if _website_release_order is not None:
+        return _website_release_order
+    try:
+        with open(WEBSITE_RELEASE_ORDER_PATH, "r", encoding="utf-8") as handle:
+            _website_release_order = json.load(handle).get("first_added", {})
+    except Exception as exc:
+        log("Could not load website release order: {}".format(exc), xbmc.LOGWARNING)
+        _website_release_order = {}
+    return _website_release_order
+
+def sort_website_modules(modules):
+    mode = get_main_menu_sort_index()
+    if mode == 1:
+        return sorted(modules, reverse=True)
+    if mode == 2:
+        first_added = get_website_release_order()
+        return sorted(modules, key=lambda name: (-int(first_added.get(name, 0)), name.lower()))
+    return sorted(modules)
+
+def select_main_menu_sort():
+    current = get_main_menu_sort_index()
+    selected = xbmcgui.Dialog().select("Sort websites...", MAIN_MENU_SORT_OPTIONS, preselect=current)
+    if selected == -1:
+        return
+    ADDON.setSetting("main_menu_website_sort", str(selected))
+    xbmc.executebuiltin("Container.Update({},replace)".format(sys.argv[0]))
 
 def build_main_menu_fast():
     if not os.path.exists(WEBSITES_DIR):
@@ -131,11 +172,11 @@ def build_main_menu_fast():
             isFolder=True,
         )
     
-    for filename in sorted(os.listdir(WEBSITES_DIR)):
-        if not filename.endswith('.py') or filename == '__init__.py':
-            continue
-
-        module_raw_name = filename[:-3]
+    website_modules = [
+        filename[:-3] for filename in os.listdir(WEBSITES_DIR)
+        if filename.endswith('.py') and filename != '__init__.py'
+    ]
+    for module_raw_name in sort_website_modules(website_modules):
         
         setting_id = get_setting_id_from_name(module_raw_name)
         if ADDON.getSetting(setting_id) == 'false':
@@ -153,8 +194,7 @@ def build_main_menu_fast():
             icon_path = DEFAULT_ICON_PATH
 
         context_menu = [
-            ('Sort by...', f'RunPlugin({sys.argv[0]}?mode=7&action=select_sort&website={module_raw_name})'),
-            ('Change Content...', f'RunPlugin({sys.argv[0]}?mode=7&action=select_content_type&website={module_raw_name})'),
+            ('Sort websites...', f'RunPlugin({sys.argv[0]}?mode=1&action=select_main_menu_sort)'),
             (ADDON.getLocalizedString(30733) or 'Open Download Manager', download_menu_command),
         ]
         if module_raw_name == 'chaturbate':
@@ -250,6 +290,11 @@ def handle_routing():
 
     if mode is None:
         build_main_menu_fast()
+        return
+
+    if mode == '1' and params.get('action') == 'select_main_menu_sort':
+        select_main_menu_sort()
+        xbmcplugin.endOfDirectory(ADDON_HANDLE, succeeded=True, updateListing=False, cacheToDisc=False)
         return
 
     if website_name == 'global_search' or mode in ('20', '21'):

@@ -1,3 +1,10 @@
+v. 1.0.18 "Rampart" - 2026-07-20
+- **Stronghold, Expanded**: Rampart completes the second half of the Stronghold update, extending Vault, Download Center and Global Search with stronger source coverage and playback paths.
+- **23 New Sources**: W1mp, PornBusy, 8KPorner, HQFap, DEFLR, MoreHardPorn, CzechVideo, HDPorn92, YesPornPleaseXXX, FOXNXX, Latest Porn Video, PornTop, LatestLeaks, ABXXX, TubeOrigin, Taxi69, EuroXXX, HD-EasyPorn, 143Porn, Porneec, PornMike, MyGoodPorn and FreePornSex.
+- **Playback & Resolvers**: Added AVSeeks, Upload18, Loadvid and GUpload resolution; expanded VidHide, MyDaddy and StreamTape support; restored TubeOrigin HLS/artwork and hardened protected-thumbnail handling.
+- **Cross-Platform Fixes**: Fixed Stripchat video playback on Android TV and preserved Motherless Being Watched Now results after playback until a manual reload.
+- **Website Menu**: Added persistent main-menu sorting through the website context menu: A-Z, Z-A or newest websites first, based on each site's first release commit.
+
 v. 1.0.17 "Stronghold" - 2026-07-17
 - **Introducing Vault**: Save videos and folders from any supported site or Global Search into Watch Later and custom collections. Batch selection, management, search, removal and portable backup/restore are built in.
 - **Download Center, Polished**: Follow active downloads with native background progress, speed and ETA, then manage the queue and history from Kodi. Main-menu visibility and progress-display duration remain fully configurable.

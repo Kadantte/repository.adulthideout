@@ -3,6 +3,7 @@
 
 import os
 import queue
+import re
 import sys
 import threading
 import time
@@ -11,6 +12,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 import xbmc
 import xbmcgui
+import xbmcvfs
 
 
 PORT_PROPERTY = "AdultHideout.ThumbProxyPort"
@@ -22,8 +24,15 @@ ALLOWED_HOSTS = frozenset((
     "st.4kporn.xxx",
     "hqpornero.com",
     "pornobae.com",
+    "yespornpleasexxx.com",
+    "www.yespornpleasexxx.com",
+    "euroxxx.net",
+    "www.euroxxx.net",
+    "images1.hdpornos.xxx",
+    "images2.hdpornos.xxx",
 ))
 ALLOWED_PATH_PREFIXES = (
+    "/_",
     "/contents/videos_screenshots/",
     "/avatar/",
     "/wp-content/uploads/",
@@ -95,12 +104,29 @@ def _ensure_clearance(session, referer):
 def _valid_image_url(url):
     try:
         parsed = urllib.parse.urlsplit(url)
+        hostname = (parsed.hostname or "").lower()
+        valid_path = parsed.path.startswith(ALLOWED_PATH_PREFIXES)
         return (
             parsed.scheme == "https"
-            and parsed.hostname
-            and parsed.hostname.lower() in ALLOWED_HOSTS
+            and hostname in ALLOWED_HOSTS
             and parsed.port in (None, 443)
-            and parsed.path.startswith(ALLOWED_PATH_PREFIXES)
+            and valid_path
+            and not parsed.username
+            and not parsed.password
+        )
+    except (TypeError, ValueError):
+        return False
+
+
+def _valid_loadvid_segment(url):
+    try:
+        parsed = urllib.parse.urlsplit(url)
+        hostname = (parsed.hostname or "").lower()
+        return (
+            parsed.scheme == "https"
+            and (hostname == "stream-baby1.top" or hostname.endswith(".stream-baby1.top"))
+            and parsed.port in (None, 443)
+            and parsed.path.startswith("/user/")
             and not parsed.username
             and not parsed.password
         )
@@ -125,10 +151,21 @@ class _Handler(BaseHTTPRequestHandler):
         pass
 
     def do_HEAD(self):
-        self._serve_thumbnail(send_body=False)
+        self._dispatch(send_body=False)
 
     def do_GET(self):
-        self._serve_thumbnail(send_body=True)
+        self._dispatch(send_body=True)
+
+    def _dispatch(self, send_body):
+        parsed = urllib.parse.urlsplit(self.path)
+        if parsed.path == "/thumb":
+            self._serve_thumbnail(send_body)
+        elif parsed.path.startswith("/loadvid/"):
+            self._serve_loadvid_playlist(parsed.path, send_body)
+        elif parsed.path.startswith("/loadvid-segment/") and parsed.path.endswith(".ts"):
+            self._serve_loadvid_segment(parsed.path, send_body)
+        else:
+            self.send_error(404)
 
     def _serve_thumbnail(self, send_body):
         self.close_connection = True
@@ -189,6 +226,97 @@ class _Handler(BaseHTTPRequestHandler):
                     self.send_error(502)
                 except Exception:
                     pass
+        finally:
+            self.session_pool.put(session)
+
+    def _serve_loadvid_playlist(self, request_path, send_body):
+        filename = request_path.rsplit("/", 1)[-1]
+        if not re.match(r"^adulthideout_loadvid_[0-9a-f]{16}\.m3u8$", filename):
+            self.send_error(400)
+            return
+        path = os.path.join(xbmcvfs.translatePath("special://temp"), filename)
+        try:
+            with open(path, "r", encoding="utf-8") as handle:
+                source = handle.read()
+            lines = []
+            segment_index = 0
+            playlist_id = filename[len("adulthideout_loadvid_"):-len(".m3u8")]
+            for line in source.splitlines():
+                value = line.strip()
+                if value and not value.startswith("#"):
+                    if not _valid_loadvid_segment(value):
+                        self.send_error(400)
+                        return
+                    value = "http://127.0.0.1:{}/loadvid-segment/{}/{}.ts".format(
+                        self.server.server_address[1],
+                        playlist_id,
+                        segment_index,
+                    )
+                    segment_index += 1
+                lines.append(value if value else line)
+            body = ("\n".join(lines) + "\n").encode("utf-8")
+            self.send_response(200)
+            self.send_header("Content-Type", "application/vnd.apple.mpegurl")
+            self.send_header("Content-Length", str(len(body)))
+            self.send_header("Cache-Control", "no-store")
+            self.send_header("Connection", "close")
+            self.end_headers()
+            if send_body:
+                self.wfile.write(body)
+        except FileNotFoundError:
+            self.send_error(404)
+        except Exception as exc:
+            _log("Loadvid playlist failed: {}".format(exc), xbmc.LOGWARNING)
+            self.send_error(502)
+
+    def _serve_loadvid_segment(self, request_path, send_body):
+        match = re.match(r"^/loadvid-segment/([0-9a-f]{16})/(\d+)\.ts$", request_path)
+        if not match:
+            self.send_error(400)
+            return
+        filename = "adulthideout_loadvid_{}.m3u8".format(match.group(1))
+        path = os.path.join(xbmcvfs.translatePath("special://temp"), filename)
+        try:
+            with open(path, "r", encoding="utf-8") as handle:
+                urls = [line.strip() for line in handle if line.strip() and not line.startswith("#")]
+            url = urls[int(match.group(2))]
+        except (FileNotFoundError, IndexError, ValueError):
+            self.send_error(404)
+            return
+        if not _valid_loadvid_segment(url):
+            self.send_error(400)
+            return
+        try:
+            session = self.session_pool.get(timeout=5)
+        except queue.Empty:
+            self.send_error(503)
+            return
+        try:
+            with session.get(
+                url,
+                headers={"User-Agent": UA, "Accept-Encoding": "identity"},
+                timeout=(5, 20),
+                stream=True,
+            ) as upstream:
+                if upstream.status_code != 200:
+                    self.send_error(502)
+                    return
+                self.send_response(200)
+                self.send_header("Content-Type", "video/mp2t")
+                length = upstream.headers.get("Content-Length")
+                if length:
+                    self.send_header("Content-Length", length)
+                self.send_header("Cache-Control", "no-store")
+                self.send_header("Connection", "close")
+                self.end_headers()
+                if send_body:
+                    for chunk in upstream.iter_content(64 * 1024):
+                        if chunk:
+                            self.wfile.write(chunk)
+        except (BrokenPipeError, ConnectionResetError):
+            pass
+        except Exception as exc:
+            _log("Loadvid segment failed: {}".format(exc), xbmc.LOGWARNING)
         finally:
             self.session_pool.put(session)
 
@@ -270,3 +398,12 @@ def build_thumb_url(image_url, referer=None):
         data["r"] = referer
     query = urllib.parse.urlencode(data)
     return "http://127.0.0.1:{}/thumb?{}".format(port, query)
+
+
+def build_loadvid_url(filename):
+    if not re.match(r"^adulthideout_loadvid_[0-9a-f]{16}\.m3u8$", filename or ""):
+        return ""
+    port = xbmcgui.Window(10000).getProperty(PORT_PROPERTY)
+    if not port or not port.isdigit():
+        return ""
+    return "http://127.0.0.1:{}/loadvid/{}".format(port, filename)

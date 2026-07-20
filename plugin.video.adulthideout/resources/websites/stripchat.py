@@ -6,6 +6,7 @@ import os
 import urllib.parse
 
 import requests
+import xbmc
 import xbmcgui
 import xbmcplugin
 
@@ -213,6 +214,56 @@ class StripchatWebsite(BaseWebsite):
         except (ValueError, TypeError):
             return {}
 
+    def _resolve_hls_variant(self, stream_url, headers):
+        """Pin Stripchat's nested master playlist to its best public variant."""
+        try:
+            response = self.session.get(stream_url, headers=headers, timeout=12)
+            response.raise_for_status()
+            manifest = response.text
+        except requests.RequestException as exc:
+            self.logger.warning("[Stripchat] Master playlist request failed: %s", exc)
+            return stream_url
+
+        if "#EXT-X-STREAM-INF:" not in manifest:
+            return stream_url
+
+        variants = []
+        lines = [line.strip() for line in manifest.splitlines()]
+        for index, line in enumerate(lines):
+            if not line.startswith("#EXT-X-STREAM-INF:"):
+                continue
+            height = 0
+            bandwidth = 0
+            for attribute in line.split(":", 1)[-1].split(","):
+                key, separator, value = attribute.partition("=")
+                if not separator:
+                    continue
+                key = key.strip().upper()
+                value = value.strip().strip('"')
+                if key == "RESOLUTION" and "x" in value.lower():
+                    try:
+                        height = int(value.lower().split("x", 1)[1])
+                    except ValueError:
+                        pass
+                elif key == "BANDWIDTH":
+                    try:
+                        bandwidth = int(value)
+                    except ValueError:
+                        pass
+
+            for candidate in lines[index + 1 :]:
+                if not candidate or candidate.startswith("#"):
+                    continue
+                variants.append((height, bandwidth, urllib.parse.urljoin(stream_url, candidate)))
+                break
+
+        if not variants:
+            return stream_url
+
+        height, _, variant_url = max(variants, key=lambda variant: (variant[0], variant[1]))
+        self.logger.info("[Stripchat] Pinned public HLS variant: %sp", height or "unknown")
+        return variant_url
+
     def play_video(self, url):
         payload = self._decode_play_token(url) if url.startswith(self.PLAY_PREFIX) else {}
         stream_url = payload.get("url") or ""
@@ -223,13 +274,17 @@ class StripchatWebsite(BaseWebsite):
             return
 
         headers = self._headers(self.base_url + urllib.parse.quote(username), accept="*/*")
+        stream_url = self._resolve_hls_variant(stream_url, headers)
         encoded_headers = urllib.parse.urlencode(headers)
         item = xbmcgui.ListItem(path=stream_url + "|" + encoded_headers)
         item.setProperty("IsPlayable", "true")
         item.setMimeType("application/vnd.apple.mpegurl")
         item.setContentLookup(False)
-        item.setProperty("inputstream", "inputstream.adaptive")
-        item.setProperty("inputstream.adaptive.manifest_type", "hls")
-        item.setProperty("inputstream.adaptive.manifest_headers", encoded_headers)
-        item.setProperty("inputstream.adaptive.stream_headers", encoded_headers)
+        if not xbmc.getCondVisibility("System.Platform.Android"):
+            item.setProperty("inputstream", "inputstream.adaptive")
+            item.setProperty("inputstream.adaptive.manifest_type", "hls")
+            item.setProperty("inputstream.adaptive.manifest_headers", encoded_headers)
+            item.setProperty("inputstream.adaptive.stream_headers", encoded_headers)
+        else:
+            self.logger.info("[Stripchat] Using native HLS playback on Android")
         xbmcplugin.setResolvedUrl(self.addon_handle, True, item)

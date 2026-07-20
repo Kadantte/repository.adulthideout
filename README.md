@@ -2,18 +2,18 @@
   <img src="repository.adulthideout/resources/fanart.jpg" alt="AdultHideout 10th Anniversary" width="100%">
 </p>
 
-<h1 align="center">AdultHideout 1.0.17</h1>
+<h1 align="center">AdultHideout 1.0.18</h1>
 <p align="center">
-  <strong>Stronghold</strong><br>
-  Everything worth keeping. One Vault.<br>
-  Released July 17, 2026.
+  <strong>Rampart</strong><br>
+  Stronghold, expanded and reinforced.<br>
+  Released July 20, 2026.
 </p>
 
-AdultHideout started in **January 2016** as a tiny personal Kodi addon for one site. Ten years later, Stronghold is built around one simple idea: finding a video should not mean losing it again.
+AdultHideout started in **January 2016** as a tiny personal Kodi addon for one site. Ten years later, **Rampart** completes the largest AdultHideout expansion yet.
 
-**Vault** gives every supported site and Global Search one shared destination for the things you want to keep. The polished **Download Center** takes it from there, with a clear queue, useful progress and offline playback when you want it.
+**Stronghold** was the first half: it introduced Vault, Download Center and a rebuilt Global Search. It grew too large to leave as one release. **Rampart is the second half and the current release**: it completes that work with twenty-three new sources, stronger playback paths, Android fixes and navigation that now understands the addon's release history.
 
-## Featured Highlights
+## The Stronghold Foundation
 
 ### Introducing Vault
 
@@ -41,9 +41,26 @@ Choose a local folder or send downloads directly to **SMB** and **NFS** storage.
 
 Twenty-five new integrations give Vault and Global Search more places to discover. Each one arrives with its own artwork and the navigation its site supports.
 
+## Rampart: The Second Half Of Stronghold
+
+### 23 New Sources, Carefully Chosen
+
+**W1mp, PornBusy, 8KPorner, HQFap, DEFLR, MoreHardPorn, CzechVideo, HDPorn92, YesPornPleaseXXX, FOXNXX, Latest Porn Video, PornTop, LatestLeaks, ABXXX, TubeOrigin, Taxi69, EuroXXX, HD-EasyPorn, 143Porn, Porneec, PornMike, MyGoodPorn and FreePornSex.**
+
+Rampart extends the Stronghold discovery layer with twenty-three new sources, selected for real full-length playback rather than shallow previews. Where a source needs it, AdultHideout uses reusable resolver support, artwork protection and quality-aware stream selection.
+
+### Discovery That Stays In Order
+
+The website menu can now be sorted **A-Z**, **Z-A** or by **Newest Websites**. The newest view is based on each source's first AdultHideout release, not unreliable file timestamps, so it remains meaningful after updates.
+
+### The Paths Around The Vault, Reinforced
+
+Rampart restores TubeOrigin artwork and HLS playback, keeps Motherless live results stable after playback, improves protected artwork paths and fixes Stripchat video playback on Android TV. New reusable resolver support covers AVSeeks, Upload18, Loadvid, GUpload, VidHide and updated MyDaddy player wrappers.
+
 ## Also Included
 
 - **Better playback choices:** Global quality preferences and mirror fallback help select a usable stream before playback begins.
+- **Stronghold, extended:** Vault, Download Center and Global Search now benefit from Rampart's expanded source coverage and more resilient playback routes.
 - **Cleaner navigation:** Vault and Download Center stay close when needed without permanently crowding the main menu.
 - **Localized features:** Vault and Download Center are available in English, German, Spanish and French.
 - **Release integrity:** Settings, artwork, manifests and official SHA-256 hashes are aligned with the release package.

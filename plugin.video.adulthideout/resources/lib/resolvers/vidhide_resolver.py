@@ -128,10 +128,41 @@ def _extract_links_object(text):
     return links
 
 
+def _morencius_hls3_url(links):
+    if links.get("hls3"):
+        return links["hls3"]
+
+    hls2 = links.get("hls2")
+    if not hls2:
+        return ""
+    try:
+        parsed = urllib.parse.urlparse(html.unescape(hls2).replace("\\/", "/"))
+        query = urllib.parse.parse_qs(parsed.query)
+        server = (query.get("srv") or [""])[0]
+        host = parsed.hostname or ""
+        path = parsed.path.replace("/hls2/", "/hls3/", 1)
+        if not server or not host.endswith(".acek-cdn.com") or path == parsed.path:
+            return ""
+        host = host[:-len(".acek-cdn.com")] + ".innovationarchive.site"
+        path = "/{}/{}".format(server, path.lstrip("/"))
+        if path.endswith("/master.m3u8"):
+            path = path[:-len("master.m3u8")] + "master.txt"
+        return urllib.parse.urlunparse(("https", host, path, "", "", ""))
+    except (TypeError, ValueError):
+        return ""
+
+
 def _pick_stream(page_html, embed_url):
     candidates = []
     for content in [page_html] + _unpack_all(page_html):
         links = _extract_links_object(content)
+        if "morencius.com" in (embed_url or "").lower():
+            # Morencius hls4 is an advertising playlist whose segments are PNG
+            # images. The real transport stream is hls3; older embeds expose it
+            # only indirectly through an hls2 URL.
+            hls3 = _morencius_hls3_url(links)
+            if hls3:
+                return _absolute_url(hls3, embed_url)
         for key in ("hls4", "hls3", "hls2", "hls"):
             if links.get(key):
                 candidates.append(_absolute_url(links[key], embed_url))
